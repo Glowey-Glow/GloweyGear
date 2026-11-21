@@ -77,7 +77,16 @@ local IDLE_S = 0.25           -- how often a job with nothing queued looks at it
 
 -- The rows to draw from Rank.Arrange's view: one "slot" row per group that has a pick, in
 -- Compare.GROUPS order, and under the selected group its alternatives.
-function Window.Model(view, selected)
+-- The game's own word for a hand (Marks.SlotName), for a pair's two rows.
+local function HandName(group)
+	local M = ns.Marks
+	return type(M) == "table" and type(M.SlotName) == "function" and M.SlotName(group) or group
+end
+
+-- `set` (Rank.Set's answer, or nil): a main hand and an off hand that are the better buy
+-- together. It gets one row of its own under the two hands, group "WEAPONS", which opens to
+-- its two items; the hands' own rows stay as they are, so no item is listed twice by default.
+function Window.Model(view, selected, set)
 	local out = {}
 	if type(view) ~= "table" or type(view.groups) ~= "table" then return out end
 	for _, group in ipairs(Compare.GROUPS) do
@@ -87,6 +96,19 @@ function Window.Model(view, selected)
 			out[#out + 1] = { kind = "slot", group = group, row = list[1], more = #list - 1, open = open }
 			if open then
 				for i = 2, #list do out[#out + 1] = { kind = "alt", group = group, row = list[i] } end
+			end
+		end
+		if group == "OFFHAND" and type(set) == "table" then
+			local open = selected == "WEAPONS"
+			local m, o = set.main, set.off
+			out[#out + 1] = { kind = "slot", group = "WEAPONS", more = 2, open = open, row = {
+				isSet = true, name = L["Both Together"], link = m.link, price = set.price, gain = set.gain,
+				pct = set.pct, far = set.far, empty = set.empty, main = m, off = o } }
+			if open then
+				out[#out + 1] = { kind = "alt", group = "WEAPONS", row = { key = m.key, link = m.link, name = m.name,
+					quality = m.quality, price = m.price, checkedAt = m.checkedAt, label = HandName("MAINHAND") } }
+				out[#out + 1] = { kind = "alt", group = "WEAPONS", row = { key = o.key, link = o.link, name = o.name,
+					quality = o.quality, price = o.price, checkedAt = o.checkedAt, label = HandName("OFFHAND") } }
 			end
 		end
 	end
@@ -318,6 +340,13 @@ function Window.IsShown()
 end
 local function Shown() return Window.IsShown() end
 
+-- The rows to draw, from the view in place: the list's own, and the weapon pair when there is one.
+local function Remodel()
+	local job = S.job
+	S.set = (job and S.view) and Rank.Set(job, ns.RankOptions(job.ctx.level), S.view) or nil
+	S.model = Window.Model(S.view, S.selected, S.set)
+end
+
 -- The exact arrangement of everything found, and a paint. Cheap enough for a control change
 -- (it sorts only the upgrades, a few hundred to a few thousand rows), too dear for every tick.
 function Window.Rearrange()
@@ -336,7 +365,7 @@ function Window.Rearrange()
 	else
 		S.view = nil
 	end
-	S.model = Window.Model(S.view, S.selected)
+	Remodel()
 	S.painted = Game.Clock()
 	Paint()
 end
@@ -367,7 +396,7 @@ Step = function()
 		if job.live.stale then return Window.Rearrange() end
 		job.live.changed = false
 		S.view = job.live:View(job.rows)
-		S.model = Window.Model(S.view, S.selected)
+		Remodel()
 		S.painted = t0
 		return Paint()
 	end
@@ -377,7 +406,7 @@ Step = function()
 	if job.live.changed and t0 - (S.painted or 0) >= REPAINT_MS then
 		job.live.changed = false
 		S.view = job.live:View(job.rows)
-		S.model = Window.Model(S.view, S.selected)
+		Remodel()
 		S.painted = t0
 		Paint()
 		return Tick(0)
@@ -523,7 +552,7 @@ local function Repriced()
 		end
 		job.live.changed = false
 		S.view = job.live:View(job.rows)
-		S.model = Window.Model(S.view, S.selected)
+		Remodel()
 		S.painted = Game.Clock()
 		S.pricedAt = S.painted
 		ns.Perf.Count("reprice")
@@ -722,6 +751,15 @@ local function RowEnter(self)
 	GameTooltip:SetOwner(self, tipSide())
 	-- (The game's own tooltip for the item's link: Daylight UI's card and the Gear Advice row
 	-- come with it.)
+	if e.row.isSet then
+		-- The pair's own row: what it is, in words.
+		GameTooltip:SetText(L["Both Together"], 1, 1, 1)
+		GameTooltip:AddLine(L["Buying these two together is a bigger upgrade than either one alone."], 0.72, 0.70, 0.66, true)
+		GameTooltip:AddDoubleLine(HandName("MAINHAND"), e.row.main.name or "", 0.72, 0.70, 0.66, QualityColor(e.row.main.quality))
+		GameTooltip:AddDoubleLine(HandName("OFFHAND"), e.row.off.name or "", 0.72, 0.70, 0.66, QualityColor(e.row.off.quality))
+		GameTooltip:Show()
+		return
+	end
 	if not pcall(GameTooltip.SetHyperlink, GameTooltip, e.row.link) then return GameTooltip:Hide() end
 	-- (A price a search confirmed since the scan says so, and how long ago.)
 	local checked = Window.CheckedText(e.row.checkedAt)
@@ -749,9 +787,10 @@ local function RowClick(self)
 		-- (The clicked slot opens its alternatives; a second click on it closes them.)
 		S.selected = (S.selected ~= e.group or not e.open) and e.group or nil
 		S.aim = e.group
-		S.model = Window.Model(S.view, S.selected)
+		Remodel()
 	end
-	Window.Search(e.row)
+	-- (The pair's own row only opens: its two items are the ones to search for.)
+	if not e.row.isSet then Window.Search(e.row) end
 	if e.kind == "slot" then Paint() end
 end
 
@@ -797,7 +836,8 @@ local function FillRow(r, e, y, C)
 	r.entry = e
 	r.icon:SetSize(size, size)
 	r.icon:SetTexture(Icon(ns.Stats.ItemID(row.link)) or 134400)   -- (134400: the game's question mark)
-	r.gain:SetText(Window.GainText(row) .. (Window.Uncounted(row, S.tips) and " *" or ""))
+	-- (A pair's two items say which hand they are for; the pair's own row has the gain.)
+	r.gain:SetText(row.label or (Window.GainText(row) .. ((not row.isSet and Window.Uncounted(row, S.tips)) and " *" or "")))
 	ink(r.gain, C.GOOD)
 	r.price:SetText(Money(row.price))
 	ink(r.price, C.VALUE)
@@ -811,7 +851,8 @@ local function FillRow(r, e, y, C)
 	if slot then
 		local M = ns.Marks
 		r.slot:SetWidth(nameW)
-		r.slot:SetText(type(M) == "table" and type(M.SlotName) == "function" and M.SlotName(e.group) or "")
+		r.slot:SetText(e.group == "WEAPONS" and L["Weapons"]
+			or (type(M) == "table" and type(M.SlotName) == "function" and M.SlotName(e.group)) or "")
 		ink(r.slot, C.LABEL)
 		r.slot:Show()
 		textH = textH + 2 + (r.slot:GetStringHeight() or 12)

@@ -671,7 +671,8 @@ T.case("rows given up are asked for again after the list is saved, and join it",
 	T.check(settle(40), "saved")
 	local nextRow = 1
 	for _ = 1, 330 do
-		slow[nextRow].late = nil
+		local r = slow[nextRow]
+		r.late = nil
 		nextRow = nextRow + 1
 		w.advance(2.1)
 		if not Market.Tail() then break end

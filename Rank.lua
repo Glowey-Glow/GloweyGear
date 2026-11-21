@@ -6,6 +6,10 @@
 --                                                   The four facts are optional: with them the
 --                                                   item is weighed BEFORE any game call.
 --                                                   checkedAt: when a search confirmed the price.
+--   Rank.Set(job, opts, view)     -> set | nil      a main hand and an off hand, both for sale,
+--                                                   that together beat what the hands hold now
+--                                                   by more than the two slots' picks add up to
+--                                                   (see WEAPON SETS below)
 --   job:Reprice(key, copper, at)  -> "row" | "known" | nil
 --                                                   a search says what the item costs now (0:
 --                                                   none left). The score does not depend on
@@ -252,6 +256,113 @@ function Live:View(rows)
 end
 
 -- ---------------------------------------------------------------------------------------------
+-- WEAPON SETS: a main hand and an off hand bought together
+-- ---------------------------------------------------------------------------------------------
+-- A row of the list is one item beside what is already owned. What that cannot say: two items
+-- for sale that are an upgrade only (or mostly) TOGETHER, such as a one-hander and a shield
+-- for someone holding a two-hander. So the job remembers, for each hand, a short list of the
+-- weapons for sale the character can wield there (upgrade alone or not): the HAND_KEEP best
+-- by score and the HAND_KEEP best by score per gold. Rank.Set tries every main hand with every
+-- off hand of those lists (at most 4 x HAND_KEEP x HAND_KEEP pairs, never the thousands a
+-- house holds) and returns the best pair under the options:
+--     gain  = Compare.PairScore(main, off) - Compare.SetValue(ctx)      (hit cap counted over both)
+--     price = the two prices added; each must be within the max price (it is a price per item)
+--     order = by gain per gold of the pair (Most per Gold) or by gain (Biggest Gain)
+-- Never a pair the character cannot hold: only items Score.Usable passed are remembered; a
+-- one-hander is an off hand only for a dual wielder (with the off-hand weights); a two-hander
+-- is in no pair; one unique-equipped item is never both hands; the same listing is never both
+-- hands (one copy is known to be for sale).
+-- It is returned only when it gains more than the list's Main Hand pick and Off Hand pick add
+-- up to. Two purchases that simply add up are already told by those two rows; the pair gets
+-- a row of its own when it says something they cannot (coming off a two-hander, mostly).
+-- Limit: the short lists are filled as the items are scored, at the prices of that moment.
+local HAND_KEEP = 8
+Rank.HAND_KEEP = HAND_KEEP
+
+local function handBetter(a, b)
+	if a.score ~= b.score then return a.score > b.score end
+	return a.key < b.key
+end
+local function handThrift(a, b)
+	if a.thrift ~= b.thrift then return a.thrift > b.thrift end
+	return a.key < b.key
+end
+
+-- Puts `e` in a list kept in `order`, HAND_KEEP long.
+local function handInto(list, e, order)
+	local n = #list
+	if n >= HAND_KEEP and not order(e, list[n]) then return end
+	local at = n + 1
+	while at > 1 and order(e, list[at - 1]) do
+		list[at] = list[at - 1]
+		at = at - 1
+	end
+	list[at] = e
+	if n + 1 > HAND_KEEP then list[n + 1] = nil end
+end
+
+function Rank.Set(job, opts, view)
+	local Compare = ns.Compare
+	local hands, ctx = job.hands, job.ctx
+	if not hands or not ctx then return nil end
+	opts = opts or {}
+	local maxPrice = tonumber(opts.maxPrice) or 0
+	local minPct = tonumber(opts.minPct) or 0
+	local byGain = opts.mode == "biggest"
+	local now = Compare.SetValue(ctx)
+	local best, bestMeasure
+	local tried = {}
+	for a = 1, 2 do
+		local mains = a == 1 and hands.main or hands.mainThrift
+		for b = 1, 2 do
+			local offs = b == 1 and hands.off or hands.offThrift
+			for i = 1, #mains do
+				local m = mains[i]
+				if not m.gone and (maxPrice <= 0 or m.price <= maxPrice) then
+					for j = 1, #offs do
+						local o = offs[j]
+						local id = m.key .. "+" .. o.key
+						if not tried[id] and not o.gone and o.key ~= m.key and (maxPrice <= 0 or o.price <= maxPrice) then
+							tried[id] = true
+							local pair = Compare.PairScore(ctx, m.rec, m.main, o.rec, o.off)
+							local gain = pair and (pair - now) or 0
+							if gain > 0 then
+								local price = m.price + o.price
+								local measure = byGain and gain or Rank.Value(gain, price, opts.level)
+								if not best or measure > bestMeasure
+									or (measure == bestMeasure and (price < best.price or (price == best.price and id < best.id))) then
+									best = { id = id, main = m, off = o, gain = gain, price = price, score = pair, base = now }
+									bestMeasure = measure
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	if not best then return nil end
+	local over = math.max(now, (ctx.typical or 0) / 2)
+	if over > 0 then
+		best.pct = best.gain / over * 100
+		best.far = best.pct > Compare.FAR
+		if best.pct < minPct then return nil end
+	end
+	best.empty = now <= 0
+	best.value = Rank.Value(best.gain, best.price, opts.level)
+	-- Said only when it tells more than the list's own two rows do.
+	local groups = view and view.groups or {}
+	local apart = 0
+	for _, group in ipairs({ "MAINHAND", "OFFHAND" }) do
+		local pick = groups[group] and groups[group][1]
+		-- (A two-hander as the Main Hand pick leaves no hand for the other pick.)
+		if pick and pick.twoHand then apart = math.max(apart, pick.gain) elseif pick then apart = apart + pick.gain end
+	end
+	if best.gain <= apart + 1e-6 then return nil end
+	return best
+end
+
+-- ---------------------------------------------------------------------------------------------
 -- The job: score what is for sale
 -- ---------------------------------------------------------------------------------------------
 local Job = {}
@@ -268,6 +379,7 @@ function Rank.Job(ctx, opts)
 		parked = {}, nParked = 0,                     -- itemID -> { link, price, link, price, ... }
 		toAsk = {}, askAt = 1, askTail = 0, askedAt = {}, nAsked = 0,   -- item IDs to ask for; itemID -> when asked
 		tries = {}, asks = {}, gaveUp = 0, later = 0, reads = 0, checked = {}, gone = 0,
+		hands = { main = {}, mainThrift = {}, off = {}, offThrift = {}, byKey = {} },
 		filtered = { class = 0, level = 0, notgear = 0 },
 		live = Rank.Live(opts),
 		scratch = {}, facts = {},
@@ -332,6 +444,8 @@ local function one(self, link, price)
 		-- (A price a search confirmed is newer than any listing of the list: it stands.)
 		if price < known and not (row and row.checkedAt) then
 			self.cheapest[key] = price
+			local hand = self.hands.byKey[key]
+			if hand and not hand.checkedAt then hand.price = price end
 			if row then
 				row.price, row.link = price, link
 				self.live.stale = true
@@ -369,6 +483,31 @@ local function one(self, link, price)
 		if v.reason == "level" then self.later = self.later + 1 end
 		return
 	end
+	-- A weapon the character can wield: remembered for its hand, upgrade alone or not (Rank.Set).
+	local asMain, asOff = Compare.HandScores(rec, self.ctx)
+	if asMain or asOff then
+		local hands = self.hands
+		local pocket = Rank.Pocket(self.ctx.level)
+		-- (Of the record only what a pair needs is kept: the record itself is not held.)
+		local e = { key = key, link = link, name = rec.name, quality = rec.quality, price = price, main = asMain, off = asOff,
+			rec = { id = rec.id, unique = rec.unique, stats = { HIT = rec.stats.HIT, SPELL_HIT = rec.stats.SPELL_HIT } },
+			checkedAt = self.checked[link] }
+		hands.byKey[key] = e
+		local gold = math.max(price, pocket) / 10000
+		if asMain and asMain > 0 then
+			e.score, e.thrift = asMain, asMain / gold
+			handInto(hands.main, e, handBetter)
+			handInto(hands.mainThrift, e, handThrift)
+		end
+		if asOff and asOff > 0 then
+			-- (A one-hander is in both hands' lists: its own entry for the off hand.)
+			local o = asMain and setmetatable({ score = asOff, thrift = asOff / gold }, { __index = e }) or e
+			if o == e then e.score, e.thrift = asOff, asOff / gold end
+			if o ~= e then hands.byKey[key .. "#off"] = o end
+			handInto(hands.off, o, handBetter)
+			handInto(hands.offThrift, o, handThrift)
+		end
+	end
 	-- Never listed: what is no better than what is owned. (A gain that is not a number, from
 	-- weights gone wrong, is no upgrade either.)
 	if v.gain ~= v.gain or v.gain <= 0 then return end
@@ -390,6 +529,15 @@ end
 -- in the queue (its price there is replaced); nil: the job has never seen the key (the caller
 -- may Add it).
 function Job:Reprice(key, copper, at)
+	-- (A weapon remembered for a pair: its price and whether it is still for sale.)
+	local hand = self.hands.byKey[key]
+	if hand then
+		if copper > 0 then hand.price, hand.gone = copper, nil else hand.gone = true end
+		hand.checkedAt = at
+		local off = self.hands.byKey[key .. "#off"]
+		if off then off.gone = rawget(hand, "gone") end
+		self.live.changed = true
+	end
 	local row = self.byKey[key]
 	if row then
 		if copper > 0 then

@@ -561,4 +561,150 @@ T.case("each item is read from the game once, however often it passes the queue"
 	T.eq(job.seen, 3, "three passes of the queue for two items: passes are not reads"); T.eq(#job.rows, 2, "both are upgrades")
 end)
 
+-- ---------------------------------------------------------------------------------------------
+-- Weapon sets
+-- ---------------------------------------------------------------------------------------------
+local WS = { STR = 1, MH_DPS = 2, OH_DPS = 1 }
+local function arm(loc, dps, more)
+	local def = { equipLoc = loc, classID = 2, subclassID = (loc == "INVTYPE_2HWEAPON") and 8 or 7,
+		raw = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = dps } }
+	for k, v in pairs(more or {}) do def[k] = v end
+	return T.item(def)
+end
+local function shield(str, more)
+	local def = { equipLoc = "INVTYPE_SHIELD", classID = 4, subclassID = 6, raw = { ITEM_MOD_STRENGTH_SHORT = str } }
+	for k, v in pairs(more or {}) do def[k] = v end
+	return T.item(def)
+end
+local function hands(class, worn, carried)
+	return Compare.Context({ class = class, level = 60, weights = WS }, worn, carried or {})
+end
+local OPTS = { level = 60 }
+
+T.case("a main hand and an off hand that are an upgrade only together", function()
+	T.reset()
+	-- holding a two-hander worth 60; for sale: a sword worth 40 and a shield worth 25
+	local job = Rank.Job(hands("WARRIOR", { [16] = arm("INVTYPE_2HWEAPON", 30) }), OPTS)
+	local sword, board = arm("INVTYPE_WEAPON", 20, { name = "Sword" }), shield(25, { name = "Board" })
+	job:Add(sword, 3 * GOLD); job:Add(board, 2 * GOLD)
+	job:Run()
+	T.eq(#job.rows, 0, "neither is an upgrade alone: no row")
+	local view = job.live:View(job.rows)
+	local set = Rank.Set(job, OPTS, view)
+	T.check(set ~= nil, "together they are")
+	T.eq(set.main.name, "Sword", "the main hand"); T.eq(set.off.name, "Board", "the off hand")
+	T.near(set.gain, 5, "40 + 25 against the two-hander's 60"); T.eq(set.price, 5 * GOLD, "priced as a set")
+	T.near(set.pct, 5 / 60 * 100, "the percent is of what the hands hold now")
+	-- the price limit is per item
+	T.eq(Rank.Set(job, { level = 60, maxPrice = 2.5 * GOLD }, view), nil, "the sword is over the max price per item: no pair")
+	T.check(Rank.Set(job, { level = 60, maxPrice = 3 * GOLD }, view) ~= nil, "at the limit it stands")
+	T.eq(Rank.Set(job, { level = 60, minPct = 20 }, view), nil, "under the smallest gain to show: no pair")
+	-- sold
+	job:Reprice(Stats.Key(board), 0, 5)
+	T.eq(Rank.Set(job, OPTS, view), nil, "the shield sold: no pair")
+	job:Reprice(Stats.Key(board), 1 * GOLD, 6)
+	T.eq(Rank.Set(job, OPTS, view).price, 4 * GOLD, "listed again, cheaper: the pair's price follows")
+end)
+
+T.case("two purchases that simply add up get no row of their own", function()
+	T.reset()
+	-- holding a sword worth 20 and no off hand; a better sword (+40) and a shield (+5) add up to +45
+	local job = Rank.Job(hands("WARRIOR", { [16] = arm("INVTYPE_WEAPON", 10) }), OPTS)
+	job:Add(arm("INVTYPE_WEAPON", 30, { name = "Sword" }), 3 * GOLD); job:Add(shield(5, { name = "Board" }), 2 * GOLD)
+	job:Run()
+	local view = job.live:View(job.rows)
+	T.eq(#job.rows, 2, "each is an upgrade alone: two rows")
+	T.eq(Rank.Set(job, OPTS, view), nil, "the pair says nothing the two rows do not")
+end)
+
+T.case("the pair against a two-hander for sale, and by which measure", function()
+	T.reset()
+	local job = Rank.Job(hands("WARRIOR", { [16] = arm("INVTYPE_2HWEAPON", 30) }), OPTS)
+	job:Add(arm("INVTYPE_WEAPON", 20, { name = "Sword" }), 3 * GOLD); job:Add(shield(25, { name = "Board" }), 2 * GOLD)
+	job:Add(arm("INVTYPE_2HWEAPON", 34, { name = "Big" }), 4 * GOLD)      -- 68: +8 alone
+	job:Run()
+	local view = job.live:View(job.rows)
+	T.eq(view.groups.MAINHAND[1].name, "Big", "the two-hander is the Main Hand pick")
+	T.eq(Rank.Set(job, OPTS, view), nil, "the pair gains 5, the two-hander 8: the pair is not said")
+	-- a better shield: the pair gains more than the two-hander
+	job:Add(shield(40, { name = "Wall" }), 2 * GOLD)
+	job:Run()
+	local set = Rank.Set(job, OPTS, job.live:View(job.rows))
+	T.eq(set.off.name, "Wall", "the better shield"); T.near(set.gain, 20, "40 + 40 against 60")
+	-- per gold or biggest: a dear, slightly better sword
+	job:Add(arm("INVTYPE_WEAPON", 21, { name = "Dear Sword" }), 60 * GOLD)
+	job:Run()
+	T.eq(Rank.Set(job, { level = 60, mode = "perGold" }, job.live:View(job.rows)).main.name, "Sword", "most per gold: the cheap sword")
+	T.eq(Rank.Set(job, { level = 60, mode = "biggest" }, job.live:View(job.rows)).main.name, "Dear Sword", "biggest gain: the dear one")
+end)
+
+T.case("never a pair the character cannot hold", function()
+	T.reset()
+	-- a mage holds no shield and no second weapon
+	local ctx = Compare.Context({ class = "MAGE", level = 60, weights = WS }, { [16] = T.item({ equipLoc = "INVTYPE_2HWEAPON", classID = 2, subclassID = 10,
+		raw = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 30 } }) }, {})
+	local job = Rank.Job(ctx, OPTS)
+	job:Add(T.item({ equipLoc = "INVTYPE_WEAPON", classID = 2, subclassID = 15, name = "Dagger", raw = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 20 } }), GOLD)
+	job:Add(shield(90, { name = "Board" }), GOLD)
+	job:Add(T.item({ equipLoc = "INVTYPE_WEAPON", classID = 2, subclassID = 15, name = "Dagger 2", raw = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 25 } }), GOLD)
+	job:Run()
+	T.eq(#job.hands.off, 0, "a shield is no off hand for a mage, nor a second dagger")
+	T.eq(Rank.Set(job, OPTS, job.live:View(job.rows)), nil, "no pair")
+	-- a rogue dual wields: the off hand's damage counts with the off-hand weight
+	T.reset()
+	job = Rank.Job(hands("ROGUE", { [16] = arm("INVTYPE_2HWEAPON", 30, { subclassID = 7 }) }), OPTS)
+	local a, b = arm("INVTYPE_WEAPON", 25, { name = "A" }), arm("INVTYPE_WEAPON", 20, { name = "B" })
+	job:Add(a, GOLD); job:Add(b, GOLD)
+	job:Run()
+	local set = Rank.Set(job, OPTS, job.live:View(job.rows))
+	T.check(set ~= nil, "two one-handers for a dual wielder")
+	T.eq(set.main.name, "A", "the stronger in the main hand"); T.eq(set.off.name, "B", "the other in the off hand")
+	T.near(set.gain, 25 * 2 + 20 * 1 - 60, "main hand damage x2, off hand damage x1, against the two-hander")
+	-- one listing is never both hands; one unique-equipped item is never both hands
+	T.reset()
+	job = Rank.Job(hands("ROGUE", { [16] = arm("INVTYPE_2HWEAPON", 30, { subclassID = 7 }) }), OPTS)
+	local only = arm("INVTYPE_WEAPON", 40, { name = "Only" })
+	job:Add(only, GOLD)
+	job:Run()
+	T.eq(Rank.Set(job, OPTS, job.live:View(job.rows)), nil, "one sword for sale is not a pair with itself")
+	local base = Stats.ItemID(arm("INVTYPE_WEAPON", 0, { name = "One" }))
+	job:Add(arm("INVTYPE_WEAPON", 40, { id = base, roll = 1, unique = true, name = "One of A" }), GOLD)
+	job:Add(arm("INVTYPE_WEAPON", 40, { id = base, roll = 2, unique = true, name = "One of B" }), GOLD)
+	job:Run()
+	set = Rank.Set(job, OPTS, job.live:View(job.rows))
+	T.check(set ~= nil, "a pair is found")
+	T.check(not (set.main.name:find("One of") and set.off.name:find("One of")), "but never two of one unique-equipped item (" ..
+		set.main.name .. " + " .. set.off.name .. ")")
+end)
+
+T.case("the lists per hand stay short, and the best pair is still found", function()
+	T.reset()
+	local job = Rank.Job(hands("WARRIOR", { [16] = arm("INVTYPE_2HWEAPON", 30) }), OPTS)
+	for i = 1, 150 do
+		job:Add(arm("INVTYPE_WEAPON", i / 10, { name = "S" .. i }), (1 + i) * GOLD)
+		job:Add(shield(i / 10, { name = "B" .. i }), (1 + i) * GOLD)
+	end
+	job:Add(arm("INVTYPE_WEAPON", 40, { name = "Best Sword" }), 5 * GOLD); job:Add(shield(50, { name = "Best Board" }), 5 * GOLD)
+	job:Run()
+	local h = job.hands
+	T.check(#h.main <= Rank.HAND_KEEP and #h.off <= Rank.HAND_KEEP and #h.mainThrift <= Rank.HAND_KEEP and #h.offThrift <= Rank.HAND_KEEP,
+		"at most " .. Rank.HAND_KEEP .. " kept per list, of 151 for sale per hand")
+	local set = Rank.Set(job, OPTS, job.live:View(job.rows))
+	T.eq(set.main.name, "Best Sword", "the best main hand"); T.eq(set.off.name, "Best Board", "and off hand")
+end)
+
+T.case("the hit cap counts over the pair", function()
+	T.reset()
+	local w = { STR = 1, MH_DPS = 2, HIT = 10 }
+	local ctx = Compare.Context({ class = "WARRIOR", level = 60, weights = w }, { [16] = arm("INVTYPE_2HWEAPON", 30),
+		[5] = T.item({ equipLoc = "INVTYPE_CHEST", classID = 4, subclassID = 0, raw = { ITEM_MOD_HIT_MELEE_RATING_SHORT = 60 } }) }, {})
+	local job = Rank.Job(ctx, OPTS)
+	-- 6% worn; the sword has 2% and the shield 2%: only 2% of the pair's 4% counts
+	job:Add(arm("INVTYPE_WEAPON", 25, { name = "Sword", raw = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 25, ITEM_MOD_HIT_MELEE_RATING_SHORT = 20 } }), GOLD)
+	job:Add(shield(15, { name = "Board", raw = { ITEM_MOD_STRENGTH_SHORT = 15, ITEM_MOD_HIT_MELEE_RATING_SHORT = 20 } }), GOLD)
+	job:Run()
+	local set = Rank.Set(job, OPTS, job.live:View(job.rows))
+	T.near(set.gain, 50 + 15 + 20 - 60, "damage, Strength and 2% of hit; the other 2% is over the cap")
+end)
+
 return T.done()

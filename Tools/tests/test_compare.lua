@@ -429,4 +429,118 @@ T.case("Evaluate fills the table it is given", function()
 	T.eq(out.pct, nil, "pct cleared"); T.eq(out.replaces, nil, "replaces cleared")
 end)
 
+-- ---------------------------------------------------------------------------------------------
+-- The hit cap
+-- ---------------------------------------------------------------------------------------------
+-- Weights: Strength 1, a percent of hit 10, a percent of spell hit 5. Ten hit rating is 1%.
+local WH = { STR = 1, HIT = 10, SPELL_HIT = 5, MH_DPS = 2, OH_DPS = 1 }
+local function hitPiece(loc, pct, str, more)
+	local def = { equipLoc = loc, classID = 4, subclassID = 0,
+		raw = { ITEM_MOD_HIT_MELEE_RATING_SHORT = pct * 10, ITEM_MOD_STRENGTH_SHORT = str or 0 } }
+	for k, v in pairs(more or {}) do def[k] = v end
+	return T.item(def)
+end
+local function hctx(worn, carried, level, mod)
+	return Compare.Context({ class = "WARRIOR", level = level or 60, weights = WH, hitMod = mod }, worn, carried)
+end
+
+T.case("the caps are the client's own figures", function()
+	local c = Compare.HitCap(60, false)
+	T.eq(c.HIT, 8, "raid bosses: 8% melee and ranged"); T.eq(c.SPELL_HIT, 17, "17% spells")
+	T.eq(Compare.HitCap(60, true).HIT, 27, "27% dual wielding")
+	c = Compare.HitCap(59, false)
+	T.eq(c.HIT, 5, "below 60, a target of the same level: 5%"); T.eq(c.SPELL_HIT, 4, "4% spells")
+	T.eq(Compare.HitCap(30, true).HIT, 24, "24% dual wielding")
+end)
+
+T.case("hit below the cap counts in full; hit beyond it counts for nothing", function()
+	T.reset()
+	-- 6% worn on other pieces, an empty head slot: room for 2%
+	local c = hctx({ [5] = hitPiece("INVTYPE_CHEST", 3), [7] = hitPiece("INVTYPE_LEGS", 3) }, {})
+	T.near(c.hit.have.HIT, 6, "6% hit on what is worn"); T.eq(c.hit.cap.HIT, 8, "of 8")
+	T.near(eval(hitPiece("INVTYPE_HEAD", 1), c).gain, 10, "1% under the cap: all of it")
+	T.near(eval(hitPiece("INVTYPE_HEAD", 2), c).gain, 20, "2% reaches the cap exactly: all of it")
+	T.near(eval(hitPiece("INVTYPE_HEAD", 3), c).gain, 20, "3%: the third percent is worth nothing")
+	T.near(eval(hitPiece("INVTYPE_HEAD", 5, 4), c).gain, 24, "5% and 4 Strength: 2% of hit and the Strength")
+	-- at the cap already: more hit is worth nothing at all
+	c = hctx({ [5] = hitPiece("INVTYPE_CHEST", 4), [7] = hitPiece("INVTYPE_LEGS", 4) }, {})
+	T.near(eval(hitPiece("INVTYPE_HEAD", 2), c).gain, 0, "capped: a hit piece gains nothing")
+	T.near(eval(hitPiece("INVTYPE_HEAD", 2, 7), c).gain, 7, "only its Strength counts")
+	-- over the cap: the same
+	c = hctx({ [5] = hitPiece("INVTYPE_CHEST", 6), [7] = hitPiece("INVTYPE_LEGS", 6) }, {})
+	T.near(eval(hitPiece("INVTYPE_HEAD", 2), c).gain, 0, "over the cap already")
+end)
+
+T.case("swapping a hit piece out for another: only what the swap changes counts", function()
+	T.reset()
+	-- 9% worn: 3 on the head, 6 elsewhere. The head's own hit is worth 2% (8 - 6).
+	local head = hitPiece("INVTYPE_HEAD", 3, 0, { name = "Old Head" })
+	local c = hctx({ [1] = head, [5] = hitPiece("INVTYPE_CHEST", 6) }, {})
+	local v = eval(hitPiece("INVTYPE_HEAD", 0, 15), c)
+	T.near(v.base, 20, "the worn head is worth the 2% it really adds, not its 3%")
+	T.near(v.gain, -5, "15 Strength against 2% of useful hit: worse")
+	v = eval(hitPiece("INVTYPE_HEAD", 0, 25), c)
+	T.near(v.gain, 5, "25 Strength: better, though the head it replaces has more hit on paper")
+	v = eval(hitPiece("INVTYPE_HEAD", 5, 0), c)
+	T.near(v.gain, 0, "5% for 3%: both fill the same 2% of room")
+	v = eval(hitPiece("INVTYPE_HEAD", 1, 0), c)
+	T.near(v.gain, -10, "1% for 3%: one useful percent lost")
+	-- taking the hit piece off drops under the cap: the new piece's hit counts again
+	c = hctx({ [1] = hitPiece("INVTYPE_HEAD", 6), [5] = hitPiece("INVTYPE_CHEST", 3) }, {})
+	v = eval(hitPiece("INVTYPE_HEAD", 4, 0), c)
+	T.near(v.base, 50, "the worn head: 5% of its 6% is useful"); T.near(v.gain, -10, "4% in its place: one useful percent less")
+end)
+
+T.case("hit from talents counts toward the cap; spell hit has its own", function()
+	T.reset()
+	local c = hctx({ [5] = hitPiece("INVTYPE_CHEST", 3) }, {}, 60, { melee = 3, spell = 0 })
+	T.near(c.hit.have.HIT, 6, "3% from gear and 3% from talents")
+	T.near(eval(hitPiece("INVTYPE_HEAD", 4), c).gain, 20, "room for 2% only")
+	-- a general hit rating feeds both; each is capped by itself
+	local both = T.item({ equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = 0, raw = { ITEM_MOD_HIT_RATING_SHORT = 100 } })
+	c = hctx({}, {}, 60)
+	T.near(eval(both, c).gain, 8 * 10 + 10 * 5, "10% of each: 8% of melee hit counts, and all 10% of spell hit (cap 17)")
+	-- below 60 the cap is the same-level one
+	c = hctx({}, {}, 40)
+	T.near(eval(hitPiece("INVTYPE_HEAD", 7), c).gain, 50, "level 40: 5% counts")
+end)
+
+T.case("rings: the weaker of the two worn is what leaves", function()
+	T.reset()
+	local c = hctx({ [11] = hitPiece("INVTYPE_FINGER", 4, 0, { name = "Hit Ring" }), [12] = hitPiece("INVTYPE_FINGER", 0, 3, { name = "Weak Ring" }),
+		[5] = hitPiece("INVTYPE_CHEST", 4) }, {})
+	-- the cap is reached (8%); a third hit ring replaces the weak ring and adds nothing
+	local v = eval(hitPiece("INVTYPE_FINGER", 2, 0), c)
+	T.eq(v.replaces.name, "Weak Ring", "the weak ring is replaced"); T.near(v.gain, -3, "its hit is over the cap: worth less than 3 Strength")
+end)
+
+T.case("dual wielding lifts the cap; a spec that does not value hit is untouched", function()
+	T.reset()
+	local worn = { [16] = arm("INVTYPE_WEAPON", 10), [17] = arm("INVTYPE_WEAPON", 8), [5] = hitPiece("INVTYPE_CHEST", 8) }
+	local c = hctx(worn, {}, 60)
+	T.eq(c.hit.dual, true, "an off-hand weapon is worn"); T.eq(c.hit.cap.HIT, 27, "the dual wield figure")
+	T.near(eval(hitPiece("INVTYPE_HEAD", 3), c).gain, 30, "hit past 8% still counts")
+	c = ctx({ [5] = hitPiece("INVTYPE_CHEST", 20) }, {})
+	T.eq(c.hit, nil, "no hit weight: no cap worked out")
+	T.near(eval(hitPiece("INVTYPE_HEAD", 3, 4), c).gain, 4, "and nothing changes")
+end)
+
+T.case("a unique-equipped weapon is never set beside its own copy", function()
+	T.reset()
+	local who = { class = "ROGUE", level = 60, weights = W }
+	local one = arm("INVTYPE_WEAPON", 20, { unique = true, name = "The One" })
+	local other = arm("INVTYPE_WEAPON", 10, { name = "Other" })
+	-- worn: The One in the main hand, nothing in the off hand; Other in the bags
+	local c = Compare.Context(who, { [16] = one }, { other })
+	T.eq(c.dual, true, "a rogue dual wields")
+	-- today: The One (40) + Other as off hand (10) = 50
+	local v = Compare.Evaluate(Stats.Of(one), c)
+	-- a second copy cannot go beside the first: as an off hand its partner is Other (20), 20 + 20 = 40 < 50;
+	-- as a main hand its partner is Other in the off hand: 40 + 10 = 50, no gain
+	T.check(v.gain <= 0, "a second copy of a unique weapon is no upgrade (" .. v.gain .. ")")
+	local free = arm("INVTYPE_WEAPON", 20, { name = "Twin" })
+	v = Compare.Evaluate(Stats.Of(free), c)
+	T.near(v.gain, 10, "a weapon just as good that is not unique is: it goes beside The One")
+end)
+
 return T.done()

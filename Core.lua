@@ -272,8 +272,34 @@ function ns.Who()
 	if who == nil and whoWhy == nil then
 		who, whoWhy = Spec.Current()
 		if who == nil and whoWhy == nil then whoWhy = "noweights" end
+		-- (For the hit cap: Compare.lua's header.)
+		if who then who.hitMod = ns.HitMod() end
 	end
 	return who, whoWhy
+end
+
+-- The hit the character has that is not on gear (talents, mostly): { melee = , spell = } in
+-- percent, kept per character. Read from the game only out of a fight (the calls are secret
+-- in one): at login and when talents or the level change (not more often: a buff that gives
+-- hit would be taken for the character's own each time). A hunter's is the ranged figure. A
+-- value outside 0 to 30 is not believed.
+function ns.HitMod()
+	local c = ns.Char()
+	return c and type(c.hit) == "table" and c.hit or nil
+end
+
+-- Reads it; true when it changed.
+function ns.ReadHitMod()
+	if ns.Game.InCombat() then return false end
+	local c = ns.Char()
+	local melee, ranged, spell = ns.Game.HitModifiers()
+	if not c or not melee then return false end
+	if ns.Game.Class() == "HUNTER" then melee = ranged end
+	if melee < 0 or melee > 30 or spell < 0 or spell > 30 then return false end
+	local old = c.hit
+	if type(old) == "table" and old.melee == melee and old.spell == spell then return false end
+	c.hit = { melee = melee, spell = spell }
+	return true
 end
 
 -- What is worn and carried, scored for ns.Who(): a Compare context, or nil when there is no one
@@ -402,13 +428,14 @@ local function ReadWho()
 		return
 	end
 	SpecNames()
+	local hitChanged = ns.ReadHitMod()
 	-- Read afresh; the others are told only when the answer is another one (the same spec,
 	-- level and weights leave every verdict as it was, and what is owned need not be read again).
 	local old = who
 	who, whoWhy = nil, nil
 	local new = ns.Who()
 	if old and new and old.class == new.class and old.spec == new.spec and old.level == new.level
-		and old.weights == new.weights then
+		and old.weights == new.weights and not hitChanged then
 		return
 	end
 	context = nil

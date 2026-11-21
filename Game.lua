@@ -289,6 +289,23 @@ function Game.Time()
 	return ok and type(t) == "number" and t or 0
 end
 
+-- The part of the character's hit chance that does not come from ratings (talents, mostly):
+-- melee, ranged, spell, in percent; nil when the game keeps them secret (in a fight). The
+-- client's own character sheet adds exactly these to the rating's share (FX Blizzard_UIPanels_
+-- Game\Camelot\PaperDollFrameStats.lua:524-527); the docs mark all three as secret while unit
+-- stats are restricted (DOC PlayerScriptDocumentation.lua:533-541, :946, :1113).
+function Game.HitModifiers()
+	local m, r, s = rawget(_G, "GetHitModifier"), rawget(_G, "GetRangedHitModifier"), rawget(_G, "GetSpellHitModifier")
+	if type(m) ~= "function" or type(s) ~= "function" then return nil end
+	local okM, melee = pcall(m)
+	local okS, spell = pcall(s)
+	local okR, ranged = false, nil
+	if type(r) == "function" then okR, ranged = pcall(r) end
+	melee, spell, ranged = okM and Plain(melee) or nil, okS and Plain(spell) or nil, okR and Plain(ranged) or nil
+	if type(melee) ~= "number" or type(spell) ~= "number" then return nil end
+	return melee, type(ranged) == "number" and ranged or melee, spell
+end
+
 function Game.InCombat()
 	return InCombatLockdown and InCombatLockdown() and true or false
 end

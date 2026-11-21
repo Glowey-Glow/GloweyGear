@@ -141,6 +141,13 @@ function Game.BagLinks(out)
 	return out
 end
 function Game.InCombat() return WORLD.combat == true end
+-- WORLD.hitMod = { melee, ranged, spell } (percent); nil = the game does not say (a fight).
+function Game.HitModifiers()
+	called("HitModifiers")
+	local m = WORLD.hitMod
+	if not m or WORLD.combat then return nil end
+	return m[1], m[2], m[3]
+end
 function Game.Clock() return WORLD.clock end
 function Game.Guid() return WORLD.guid end
 function Game.Name() return WORLD.name end
@@ -235,7 +242,7 @@ end
 -- Starts a case from nothing: no items cached, nothing worn or carried.
 function T.reset()
 	WORLD.items, WORLD.worn, WORLD.bags, WORLD.speed, WORLD.effects = {}, {}, {}, {}, {}
-	WORLD.combat, WORLD.clock = false, 0
+	WORLD.combat, WORLD.clock, WORLD.hitMod = false, 0, nil
 	WORLD.guid, WORLD.name, WORLD.realm, WORLD.realmID, WORLD.faction = "Player-4407-00ABCDEF", "Tester", "Test Realm", nil, "Alliance"
 	WORLD.class, WORLD.level, WORLD.trees, WORLD.skills, WORLD.spells = "WARRIOR", 60, nil, nil, {}
 	WORLD.calls, WORLD.requested, WORLD.noCacheCall = {}, {}, nil
