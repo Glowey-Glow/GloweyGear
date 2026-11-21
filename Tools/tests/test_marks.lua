@@ -653,8 +653,8 @@ T.case("a verdict too long for the card's row goes on a line of its own, under i
 	T.check(not M.Fits("장비 조언", "훈련하지 않은 무기 숙련이 필요합니다"), "wide characters count wide")
 	-- every verdict sentence in every language: whichever layout is chosen, nothing is cut
 	local longest = 0
-	for _, locale in ipairs({ "enUS", "deDE", "esES", "frFR", "koKR", "ruRU", "zhCN" }) do
-		local Ml = boot({ shim = "own", lang = locale })
+	for _, lang in ipairs({ "enUS", "deDE", "esES", "frFR", "koKR", "ruRU", "zhCN" }) do
+		local Ml = boot({ shim = "own", lang = lang })
 		local L = NS.L
 		local label = L["Gear Advice"]
 		for _, key in ipairs({ "+%s%% over your %s", "Far better than your %s", "Better than your %s", "Fills your empty %s slot",
@@ -662,14 +662,14 @@ T.case("a verdict too long for the card's row goes on a line of its own, under i
 			local text = L[key]:gsub("%%s%%%%", "12%%%%"):gsub("%%s", "Main Hand"):gsub("%%d", "60"):gsub("%%%%", "%%")
 			local w = Ml.Width(label) + Ml.Width(text)
 			if Ml.Fits(label, text) then
-				T.check(w <= Ml.ROW_ROOM, locale .. ": a verdict kept in the row is within the row's room (" .. text .. ")")
+				T.check(w <= Ml.ROW_ROOM, lang .. ": a verdict kept in the row is within the row's room (" .. text .. ")")
 				longest = math.max(longest, w)
 			end
 		end
 	end
 	T.check(longest > 0, "some verdicts do stay in the row")
 	-- the two layouts, as the tooltip gets them
-	M = boot({ shim = "own" })
+	boot({ shim = "own" })
 	WORLD.class, WORLD.level = "WARRIOR", 60
 	WORLD.worn[1] = helm(10)
 	owned()
