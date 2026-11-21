@@ -14,7 +14,10 @@
 -- Rules that keep it quiet:
 --   * nothing the first time a house is scored for a character, or after the spec, the Best
 --     Pick or the house changed (there is nothing to compare with: it is only remembered);
---   * one line at a time, the biggest news; never two lines within QUIET seconds;
+--   * one line at a time, the biggest news; never two lines within QUIET seconds (news found
+--     inside that minute is kept and said when it is over);
+--   * nothing after a change of Max Price, Smallest Gain to Show, Only My Best Armor Type, the
+--     level or what is worn and carried: those change the picks with nothing new for sale;
 --   * never in a fight (nothing is remembered then either, so the news keeps);
 --   * off with the Chat Alert switch, and with Show Gear Advice.
 -- What is remembered is per character: DaylightGearDB.chars[guid].seen =
@@ -22,7 +25,7 @@
 -- Limit: the list is scored while the Upgrades for Sale window is up (docked beside the Auction
 -- House, it is), so that is when news is found.
 --
--- luacheck: read globals ITEM_QUALITY_COLORS
+-- luacheck: read globals ITEM_QUALITY_COLORS C_Timer
 
 local _, ns = ...
 if ns.off or not ns.ok then return end
@@ -74,22 +77,58 @@ function Alert.Line(row)
 	return L["New best upgrade for sale: %s for your %s (%s, %s)."]:format(Alert.Link(row), slot, gain, money)
 end
 
-function Alert.Check(view)
+-- `owned` (optional): a signature of what is worn and carried (Window.lua's), so that a
+-- piece sold, banked or bought makes the next look a silent one.
+local held = nil       -- news found inside the quiet minute: said when it is over
+local holding = false
+
+local function speakHeld()
+	holding = false
+	if not held then return end
+	if ns.Get("enabled") == false or ns.Get("alert") == false then
+		held = nil
+		return
+	end
+	local now = ns.Game.Time()
+	if ns.Game.InCombat() or (last and now - last < QUIET) then
+		holding = true
+		return C_Timer.After(5, speakHeld)
+	end
+	local row = held
+	held, last = nil, now
+	-- (Sold in the meantime: nothing to say.)
+	if not row.gone then ns.Print(Alert.Line(row)) end
+end
+
+function Alert.Check(view, owned)
 	if ns.Get("enabled") == false or ns.Get("alert") == false then return end
 	if ns.Game.InCombat() then return end
 	local c, who = ns.Char(), ns.Who()
 	local house = ns.Market.House()
 	if not c or not who or not house or type(view) ~= "table" then return end
 	local mode = ns.Get("mode") == "biggest" and "biggest" or "perGold"
+	-- Everything that changes which item is a slot's pick without anything new being for sale:
+	-- the options that filter the list, and what is owned. A change of any of them makes the
+	-- next look a silent one (the picks are only remembered).
+	local under = table.concat({ tostring(ns.Get("maxPrice")), tostring(ns.Get("minGain")), tostring(ns.Get("bestArmor")),
+		tostring(who.level), tostring(owned) }, "|")
 	local seen = type(c.seen) == "table" and c.seen or nil
-	if seen and (seen.house ~= house or seen.spec ~= who.spec or seen.mode ~= mode) then seen = nil end
+	if seen and (seen.house ~= house or seen.spec ~= who.spec or seen.mode ~= mode or seen.under ~= under) then seen = nil end
 	local news, slots = Alert.News(seen and seen.slots or nil, view, mode)
-	c.seen = { house = house, spec = who.spec, mode = mode, slots = slots }
+	c.seen = { house = house, spec = who.spec, mode = mode, under = under, slots = slots }
 	if not news then return end
 	local now = ns.Game.Time()
-	if last and now - last < QUIET then return end
+	if last and now - last < QUIET then
+		-- Inside the quiet minute: kept (the newest of them), and said when the minute is over.
+		held = news
+		if not holding then
+			holding = true
+			C_Timer.After(math.max(1, QUIET - (now - last)), speakHeld)
+		end
+		return
+	end
 	last = now
 	ns.Print(Alert.Line(news))
 end
 
-function Alert.Reset() last = nil end
+function Alert.Reset() last, held = nil, nil end

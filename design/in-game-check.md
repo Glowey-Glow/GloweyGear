@@ -113,23 +113,41 @@ After **each** hover, type `/gear debug` and look at the lines `last item:` and 
 
 **Not good, paste back:** every `prices:` line, the `rows with no link in time, by cause:` line and the tail line. If a rolled row was marked gone while it is plainly still for sale (or the other way round), also the row's name.
 
-## 5b. Stage 2 (5 minutes)
+## 5b. Stage 2 (8 minutes, riskiest first)
 
-**Do:**
-1. `/gear debug`, and read the `hit:` line and the two `other addons on ...` lines.
-2. With the Upgrades for Sale list scored, look under Main Hand and Off Hand for a row labeled **Weapons** ("Both Together"). Click it; hover its two items.
-3. Hand in (or pick up to hand in) a quest that offers a choice of gear. Hover the rewards.
-4. Do a second Full scan a while after the first (or press Check Prices), with the window up.
-5. With Polestar loaded: a few seconds after login a window "Glowey's Gear" asks about bags and tooltips. Press Apply as it stands, open the bags, then go to the options (Plugins, Gear, Other Addons), switch **Leave Bag Marks to Them** on, and look at the bags again.
+The order is the stage 2 audit's (`design\audit-stage2.md`), after its fix pass. Each step says what good looks like and what to paste back if it is not.
 
-**Good:**
-- After 1: `hit: melee and ranged X% of 8` (or `of 5` below level 60, `of 27` dual wielding), where X is what the character sheet's Hit Chance says, and the "not from gear" part matches your talents. A capped character sees a hit item score as if it had no hit.
-- After 2: the row is there only when two items for sale beat your weapons by more than the Main Hand and Off Hand rows add up to; it opens to exactly two items, each saying its hand; neither is something your class cannot hold.
-- After 3: one chat line "Best quest reward for you: [Item] (...)." about half a second after the page opens, once; that reward's tooltip has the Gear Advice row and "Best reward of this quest for you." A quest with one reward says nothing.
-- After 4: at most one line "New best upgrade for sale: ..." and only if a slot's pick really changed for the better; the link in it can be clicked.
-- After 5: with Apply, Polestar's bag arrows are gone and ours show; with the switch on, ours are gone and Polestar's are back. Nothing else of Polestar's changed.
+**1. The hit line (1 minute).** `/gear debug`, read the `hit:` line; then hover Hit Chance on the character sheet.
+- *Good:* `hit: melee X% of 8` (`of 5` below level 60; `ranged` for a hunter, and never a dual wield note for a hunter, whatever is in the hands). X is the sheet's figure minus any hit from enchants and buffs; "not from gear" is what your talents give. A dual wielder's line ends with `dual wielding: from 8% to 27% hit counts for 50% of its weight`.
+- *Paste back:* the `hit:` line, the sheet's Hit Chance tooltip text (it also settles whether the warrior and hunter tooltips say 8.00 and 27.00 like the rogue's), and your hit talents. On a mage or warlock with a talent for one school: whether "not from gear" shows it.
 
-**Not good, paste back:** the `hit:` line with what the character sheet shows; the chat line and the rewards' names; the `other addons on ...` lines; for the pair, the two items' names and your class.
+**2. Polestar and the bags (1 minute, with Polestar loaded, before answering our question).** Open Daylight UI's bags with an upgrade in them.
+- *Good, as the code reads:* Polestar's arrow (top left) and our plus are both on the item. That is the overlap the question is about.
+- *Paste back:* whether Polestar's arrow shows in Daylight UI's bags at all. If it never does, the audit was right and the Polestar bag row should go.
+
+**3. At the cap (1 minute).** On a character at or over the cap, hover an item with hit in the bags and one for the same slot without.
+- *Good:* the hit item scores as if it had no hit (its row follows its other stats only). Swapping your own hit piece out is charged: an item without hit reads worse than its other stats alone would say.
+- *Paste back:* the two rows, the `hit:` line, and the `last item:` line after each hover.
+
+**4. A quest with a choice (2 minutes).** Hand in a quest with a choice of gear at an NPC not visited this session. Hover the rewards. Close the page without choosing and open it again.
+- *Good:* one chat line "Best quest reward for you: [Item] (...)." within a few seconds, even when the rewards show up a moment after the page; the best reward's tooltip has the Gear Advice row and "Best reward of this quest for you."; the second opening says nothing in chat but the tooltip line is there. A quest with one reward says nothing.
+- *Paste back:* whether the line came at all and how long after the page, the rewards' names, and whether the tooltip line was on the reward the chat named.
+
+**5. Both Together (1 minute).** Upgrades for Sale with the list scored: look under Main Hand and Off Hand for a row labeled Weapons.
+- *Good:* it is there only when two items for sale beat what you hold by more than the two rows above it add up to (or, with a two-hander as the Main Hand row, by more than the better of the two); it opens to exactly two items, each saying its hand; neither is something your class cannot hold; it is never the pair you already hold.
+- *Paste back:* the two items' names and stats, what you hold in both hands, your class, and the `hit:` line.
+
+**6. The alert (1 minute).** Press Check Prices; raise Max Price; search any listed item in the Auction House.
+- *Good:* no "New best upgrade for sale" about a listing that was there all along; a line only after a second scan or a price check that really turned up a better buy; its link shows the item's color and opens on click.
+- *Paste back:* the line, and what you did just before it.
+
+**7. The question about other addons (1 minute, with Polestar loaded).** A few seconds after login a window "Glowey's Gear" asks about bags and tooltips. Press Apply as it stands, then `/gear debug`.
+- *Good:* `other addons on bags: Polestar (switched by us); ours shows`, the same for tooltips. Polestar's arrow is gone from Daylight UI's bags and its gear line from tooltips; ours show. In the options (Plugins, Gear, Other Addons) switch **Leave Tooltips to Them** on and hover an item: Polestar's line is back, ours is gone. Switch it off again. Switch our **Item Tooltips** off: Polestar's line comes back by itself; on again: gone again. Nothing else of Polestar's changed.
+- *Paste back:* the two `other addons on ...` lines and what you saw on a tooltip and in the bags at each point.
+
+**8. Ask Again and a controller (30 seconds).** Press Ask Again with the options open; with a controller, move through the two switches and the buttons.
+- *Good:* the window opens above the options; the D-pad reaches both switches, Apply and Ask Me Later; B closes it.
+- *Paste back:* what could not be reached.
 
 ## 6. A saved roll, read back (1 minute)
 
@@ -174,7 +192,12 @@ After **each** hover, type `/gear debug` and look at the lines `last item:` and 
 | Does `GetItemStats("item:<saved key>")` give the rolled stats, and `GetItemInfo` the rolled name? Does a search by a rolled name find the roll? | 6 |
 | Do search-result links carry the roll as bonus IDs, as scan links do? (`showed no roll for a suffixed item` must stay 0.) Does Daylight UI's item search for gear really return every roll, so "none left" is right for rolls? Does the purchase event arrive with the auction ID we read? | 5a |
 | Why did a quarter of the gear rows give no link in time (which cause), and does reading them again while the house stays open bring them in? | 5a |
-| Does `GetHitModifier` give the talent part of hit alone (no gear, no rating)? Is the Weapons row right for a real character? Do `QUEST_COMPLETE` and the choice calls behave as read, in Daylight UI's quest window and the game's? Does Polestar follow `Set("gear.bagArrows", false)` at once? Does the overlap window work with a controller? | 5b |
+| Does `GetHitModifier` give the talent part of hit alone, and is it settled at login? Do the warrior and hunter Hit Chance tooltips say 8.00 and 27.00? Do school-specific caster talents show in the spell figure? | 5b.1 |
+| Does Polestar's bag arrow show in Daylight UI's bags (the code says yes, the audit said no)? | 5b.2 |
+| Do the reward choices arrive late, and does the line still come? Does the quest tooltip's link give the same key as the choice's link? | 5b.4 |
+| Is the Weapons row right for a real character? Is one half a fair share for a dual wielder's hit past the cap? | 5b.5 |
+| Does the chat line's built link show the right color and open on click? | 5b.6 |
+| Does Polestar follow `Set("gear.tooltip", false)` at once? Does the overlap window open above the options and work with a controller? | 5b.7, 5b.8 |
 | ~~Does the replicate list survive the Auction House closing?~~ **Settled: no** (0 rows at the close). Step 7 still checks the saved list. | 7 |
 | How many gear rows are still lost as "item never loaded" now that a row is read as soon as it has a link (27,689 of 85,406 before)? | 0, 5 |
 | Still open after this run: what `GetItemUniquenessByID` answers for "Unique" versus "Unique-Equipped"; whether an untrained weapon skill reads as nil; whether `C_PlayerInfo.CanUseItem` knows class restrictions; the real scan cooldown; how our rows and marks sit beside Polestar's. | |

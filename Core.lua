@@ -565,9 +565,10 @@ local function Debug()
 	local ctx = ns.Context()
 	if ctx and ctx.hit then
 		local h = ctx.hit
-		print(("hit: melee and ranged %.2f%% of %d (%.2f%% not from gear), spell %.2f%% of %d (%.2f%% not from gear)%s"):format(
-			h.have.HIT, h.cap.HIT, h.mod.HIT, h.have.SPELL_HIT, h.cap.SPELL_HIT, h.mod.SPELL_HIT,
-			h.dual and "; dual wielding" or ""))
+		print(("hit: %s %.2f%% of %d (%.2f%% not from gear), spell %.2f%% of %d (%.2f%% not from gear)%s"):format(
+			h.ranged and "ranged" or "melee", h.have.HIT, h.cap.HIT, h.mod.HIT, h.have.SPELL_HIT, h.cap.SPELL_HIT, h.mod.SPELL_HIT,
+			h.dual and ("; dual wielding: from %d%% to %d%% hit counts for %d%% of its weight"):format(h.cap.HIT, h.cap.DUAL,
+				Compare.DUAL_SHARE * 100) or ""))
 	elseif ctx then
 		print("hit: this spec's weights do not value hit, so no cap is worked out")
 	end
@@ -654,6 +655,7 @@ local function ModuleOff(name)
 	local ok, on = pcall(API.IsModuleEnabled, name)
 	return ok and on == false
 end
+ns.ModuleOff = ModuleOff
 local function NoTooltips() return ModuleOff("Tooltip") end
 local function NoBags() return ModuleOff("Bags") end
 

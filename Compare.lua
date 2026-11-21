@@ -52,23 +52,42 @@
 -- 17% spells, 27% dual wielding; against targets of the character's own level 5%, 4% and 24%.
 -- The second reference is the client's Lua: FX Blizzard_UIPanels_Game\Camelot\
 -- PaperDollFrameStats.lua:460-461 has 5.0 and 4.0 at the same level and 17.0 for spells three
--- levels up (its 9.0 for melee three levels up is not what the tooltip shows, and is used
--- nowhere in that file: the tooltip's 8% stands).
+-- levels up (its 9.0 for melee three levels up is in a table that function never reads: the
+-- tooltip's 8% stands).
 --   * Which cap: at level 60 the raid boss figures (the level 60 weights are made for raids);
 --     below 60 the same-level figures. The leveling brackets of the weights already make a
 --     point of hit worth less; the cap is about HOW MUCH hit counts, so the two do not clash.
---   * Dual wielding (an off-hand WEAPON is worn): the dual wield figure, as the tooltip gives
---     it. In practice that is no cap.
+--   * THREE KINDS OF ATTACK, each with its own cap and its own total. The weights have two
+--     hit stats: HIT (melee and ranged) and SPELL_HIT. For a hunter HIT is ranged hit (the
+--     ranged share of who.hitMod, 8% / 5%, and never a dual wield figure: ranged attacks do
+--     not dual wield); for every other class it is melee hit. Which of them matter is the
+--     weights' business: a stat with no weight is not looked at.
+--   * DUAL WIELDING (an off-hand WEAPON is held, melee only). The tooltip's 27% (24%) is for
+--     NORMAL swings; special attacks never miss from 8% (5%) on. The client names the two
+--     kinds itself (STAT_HIT_NORMAL_ATTACKS "Normal Attacks", STAT_HIT_SPECIAL_ATTACKS
+--     "Special Attacks", same database), and its rogue tooltip lists "8.00% Melee/Ranged"
+--     beside "27.00% Dual Wielding": those are the two references for the rule. So up to 8%
+--     hit counts in full, and from there to 27% it counts for Compare.DUAL_SHARE of its
+--     weight: the share of a dual wielder's damage that normal swings do. That share is OUR
+--     OWN ESTIMATE, one half, for every class: the weights' upstream presets hold a single
+--     hit weight and no value for hit past the cap (Tools\data\upstream.json: only
+--     StatHitRating), and no table of damage shares ships. Past 27% hit counts for nothing.
 --   * What the character has: the hit on every worn item (from their links) plus who.hitMod =
 --     { melee, spell }, the part that does not come from ratings (talents, mostly), which
 --     Core.lua reads out of a fight and keeps (see there). No call is made in a fight.
---   * An item's hit counts only as far as the cap has room once the item it would replace is
---     taken off: counted = min(its hit, cap - (hit had - hit of what leaves)), never under 0.
---     What is owned is valued the same way (each piece as if it were the last one put on), so a
---     gain is always (new piece in the set) - (old piece in the set).
+--   * THE OUTFIT IS VALUED AS A WHOLE. A verdict compares two outfits: the one the character
+--     can make today (the best owned piece or pieces in the place in question) and the one
+--     with the candidate in. Each is worth the plain scores of the pieces with their hit
+--     taken out, plus what the outfit's TOTAL hit is worth under the caps that outfit has
+--     (a two-hander in place of two weapons ends dual wielding, and the other way round). So
+--     one item, a pair and a two-hander are all measured the same way, and an item identical
+--     to the one it replaces gains exactly nothing.
+--     out.score and out.base are the candidate's and the replaced piece's worth in that
+--     outfit (each measured from the outfit with the place left empty), so gain = score - base.
 --   * Limits: a buff that gives hit at the moment Core.lua reads the game counts as the
---     character's own until the next read; a carried item is valued against the worn item of
---     its slot.
+--     character's own until the next read; hit from an enchant on a worn item (a scope) and
+--     from set bonuses is not on a link and is not counted; talents that lower one spell
+--     school's resist chance are likely not in the spell figure the game gives.
 --
 -- THE PERCENT. gain is in score points and is what ranking uses. The percent is only for
 -- reading, and a bare gain / base misleads when the replaced item is worth next to nothing to
@@ -117,16 +136,19 @@ Compare.SLOT_OF = { HEAD = 1, NECK = 2, SHOULDER = 3, BACK = 15, CHEST = 5, WRIS
 	WAIST = 6, LEGS = 7, FEET = 8, FINGER = 11, TRINKET = 13, MAINHAND = 16, TWOHAND = 16,
 	OFFHAND = 17, RANGED = 18 }
 
--- Hit needed never to miss: { melee, spell, dual } against raid bosses and against targets of
--- the character's own level (see THE HIT CAP in the header for where the figures are from).
+-- Hit needed never to miss, against raid bosses and against targets of the character's own
+-- level: HIT for melee special attacks and for ranged attacks, DUAL for a dual wielder's
+-- normal swings, SPELL_HIT for spells (see THE HIT CAP in the header for where they are from).
 Compare.HIT_CAP = { boss = { HIT = 8, SPELL_HIT = 17, DUAL = 27 }, level = { HIT = 5, SPELL_HIT = 4, DUAL = 24 } }
 Compare.TOP_LEVEL = 60
-local HITS = { "HIT", "SPELL_HIT" }
+-- What a percent of hit between HIT and DUAL is worth to a dual wielder, as a share of the
+-- weight: our own estimate of the part of the damage that normal swings do (see the header).
+Compare.DUAL_SHARE = 0.5
 
--- The caps for a character: { HIT = , SPELL_HIT = }.
-function Compare.HitCap(level, dualWielding)
+-- The caps for a character's level: { HIT = , SPELL_HIT = , DUAL = }.
+function Compare.HitCap(level)
 	local row = (level or 1) >= Compare.TOP_LEVEL and Compare.HIT_CAP.boss or Compare.HIT_CAP.level
-	return { HIT = dualWielding and row.DUAL or row.HIT, SPELL_HIT = row.SPELL_HIT }
+	return { HIT = row.HIT, SPELL_HIT = row.SPELL_HIT, DUAL = row.DUAL }
 end
 
 local PAIR = { FINGER = true, TRINKET = true }
@@ -143,36 +165,61 @@ local function offScore(rec, weights, mainScore)
 		- speed * (weights.MH_SPEED or 0) + speed * (weights.OH_SPEED or 0)
 end
 
--- A piece's score with the hit that would go over the cap taken out. `leaves` and `leaves2`
--- are the records of what comes off for it (either may be nil), `extra` hit of a partner
--- that goes on with it ({ HIT = , SPELL_HIT = }, or nil).
-local function capped(ctx, rec, score, leaves, leaves2, extra)
-	local hit = ctx.hit
-	if not hit then return score end
-	local stats, w = rec.stats, ctx.weights
-	for i = 1, 2 do
-		local k = HITS[i]
-		local h, weight = stats[k] or 0, w[k] or 0
-		if h > 0 and weight > 0 then
-			local others = hit.have[k] - (leaves and leaves.stats[k] or 0) - (leaves2 and leaves2.stats[k] or 0)
-				+ (extra and extra[k] or 0)
-			local room = hit.cap[k] - others
-			if room < 0 then room = 0 end
-			if h > room then score = score - (h - room) * weight end
+-- What an outfit's total hit is worth: `hit` percent of melee or ranged hit and `spell`
+-- percent of spell hit, `dual` when it dual wields (melee only).
+local function hitValue(ctx, hit, spell, dual)
+	local cap, w = ctx.hit.cap, ctx.weights
+	local v = 0
+	local wh, ws = w.HIT or 0, w.SPELL_HIT or 0
+	if wh > 0 and hit > 0 then
+		v = (hit < cap.HIT and hit or cap.HIT) * wh
+		if dual and hit > cap.HIT then
+			v = v + ((hit < cap.DUAL and hit or cap.DUAL) - cap.HIT) * wh * Compare.DUAL_SHARE
 		end
 	end
-	return score
+	if ws > 0 and spell > 0 then v = v + (spell < cap.SPELL_HIT and spell or cap.SPELL_HIT) * ws end
+	return v
+end
+Compare.HitValue = hitValue
+
+-- Whether holding `rec` in the off hand makes the character dual wield, for melee hit.
+local function isDual(ctx, rec)
+	local h = ctx.hit
+	return h ~= nil and rec ~= nil and rec.classID == 2 and not h.ranged
 end
 
--- What comes off when something goes in a group's place and the piece it replaces is not a
--- worn one: the worn record(s) of that place.
+-- What the pieces r1 and r2 (plain scores s1 and s2; any may be nil) are worth in the outfit
+-- once the worn pieces l1 and l2 (either may be nil) are off and they are on: their scores
+-- without their hit, plus what the whole outfit's hit is then worth. `dual`: the outfit dual
+-- wields. With no pieces it is what the rest of the outfit's hit is worth with the place empty.
+local function outfit(ctx, l1, l2, dual, r1, s1, r2, s2)
+	local sum = (r1 and s1 or 0) + (r2 and s2 or 0)
+	local h = ctx.hit
+	if not h then return sum end
+	local w = ctx.weights
+	local wh, ws = w.HIT or 0, w.SPELL_HIT or 0
+	local hit, spell = h.have.HIT, h.have.SPELL_HIT
+	if l1 then hit, spell = hit - (l1.stats.HIT or 0), spell - (l1.stats.SPELL_HIT or 0) end
+	if l2 and l2 ~= l1 then hit, spell = hit - (l2.stats.HIT or 0), spell - (l2.stats.SPELL_HIT or 0) end
+	if r1 then
+		local a, b = r1.stats.HIT or 0, r1.stats.SPELL_HIT or 0
+		hit, spell, sum = hit + a, spell + b, sum - a * wh - b * ws
+	end
+	if r2 then
+		local a, b = r2.stats.HIT or 0, r2.stats.SPELL_HIT or 0
+		hit, spell, sum = hit + a, spell + b, sum - a * wh - b * ws
+	end
+	return sum + hitValue(ctx, hit, spell, dual)
+end
+
+-- The worn record(s) of a group's place.
 local function wornOf(ctx, group)
 	local w = ctx.wornRec
-	if group == "TWOHAND" then return w[16], w[17] end
-	if PAIR[group] then return ctx.wornLow[group] end
+	if WEAPONS[group] then return w[16], w[17] end
+	if group == "FINGER" then return w[11], w[12] end
+	if group == "TRINKET" then return w[13], w[14] end
 	return w[Compare.SLOT_OF[group]]
 end
-Compare.Capped, Compare.WornOf = capped, wornOf
 
 -- ---------------------------------------------------------------------------------------------
 -- What is owned
@@ -189,7 +236,7 @@ function Compare.Context(who, worn, carried, opts)
 	Score.Fresh()
 	local ctx = { class = who.class, level = who.level, weights = who.weights,
 		bestArmor = opts and opts.bestArmor or false, pools = {}, pending = 0, typical = 0,
-		wornRec = {}, wornLow = {} }
+		wornRec = {} }
 	ctx.dual = Score.CanDualWield(ctx)
 	local pools = ctx.pools
 	local wornSum, wornCount, items = 0, 0, 0
@@ -216,10 +263,11 @@ function Compare.Context(who, worn, carried, opts)
 		if slot then ctx.wornRec[slot] = rec end
 		items = items + 1
 		-- (`item` tells two entries of one physical item apart from two copies of it.)
-		into(group, { rec = rec, score = score, slot = slot, item = items })
+		into(group, { rec = rec, score = score, raw = score, slot = slot, item = items })
 		if rec.equipLoc == ONE_HAND and ctx.dual then
 			-- The same weapon as a possible off hand.
-			into("OFFHAND", { rec = rec, score = offScore(rec, ctx.weights, score), slot = slot, item = items })
+			local asOff = offScore(rec, ctx.weights, score)
+			into("OFFHAND", { rec = rec, score = asOff, raw = asOff, slot = slot, item = items })
 		end
 	end
 	for slot = 1, 18 do
@@ -239,25 +287,26 @@ function Compare.Context(who, worn, carried, opts)
 				have.SPELL_HIT = have.SPELL_HIT + (rec.stats.SPELL_HIT or 0)
 			end
 		end
-		local off = ctx.wornRec[17]
-		local dualWielding = off ~= nil and off.classID == 2
-		ctx.hit = { have = have, cap = Compare.HitCap(ctx.level, dualWielding), dual = dualWielding,
+		-- (A hunter's HIT is ranged hit: Core.lua gives the ranged share, and no dual wield figure applies.)
+		ctx.hit = { have = have, cap = Compare.HitCap(ctx.level), ranged = ctx.class == "HUNTER",
 			mod = { HIT = mod and tonumber(mod.melee) or 0, SPELL_HIT = mod and tonumber(mod.spell) or 0 } }
-		-- (Of two rings or trinkets worn, the weaker is the one a new one replaces.)
-		for group in pairs(PAIR) do
-			local low
-			for _, e in ipairs(pools[group] or {}) do
-				if e.slot and (not low or e.score < low.score) then low = e end
-			end
-			ctx.wornLow[group] = low and low.rec or nil
-		end
-		-- Every owned piece valued as the last one put on.
+		local dualNow = isDual(ctx, ctx.wornRec[17])
+		ctx.hit.dual = dualNow
+		-- Every owned piece gets the worth it has in the outfit worn now (a worn piece: what the
+		-- outfit loses without it; a carried one: what it adds in the place of the worn piece),
+		-- which is what the pools are ordered by. Verdicts value whole outfits (Evaluate).
 		for group, pool in pairs(pools) do
 			for _, e in ipairs(pool) do
 				if e.slot then
-					e.score = capped(ctx, e.rec, e.score, e.rec, group == "TWOHAND" and ctx.wornRec[17] or nil)
+					local without = dualNow and e.slot ~= 17
+					e.score = outfit(ctx, e.rec, nil, dualNow, e.rec, e.raw) - outfit(ctx, e.rec, nil, without)
 				else
-					e.score = capped(ctx, e.rec, e.score, wornOf(ctx, group))
+					local l1, l2 = wornOf(ctx, group)
+					if PAIR[group] then l2 = nil end
+					if group == "MAINHAND" then l2 = nil elseif group == "OFFHAND" then l1 = l2 l2 = nil end
+					local dual = dualNow
+					if group == "OFFHAND" then dual = isDual(ctx, e.rec) elseif group == "TWOHAND" then dual = false end
+					e.score = outfit(ctx, l1, l2, dual, e.rec, e.raw) - outfit(ctx, l1, l2, dual and group ~= "OFFHAND")
 				end
 			end
 		end
@@ -327,9 +376,15 @@ local function excludedItem(ctx, exclude)
 	return nil
 end
 
-local function scoreOf(e) return e and e.score or 0 end
 
--- The best main hand and off hand that are two different items: main, off (either may be nil).
+-- What a main hand and an off hand (entries; either may be nil) are worth held together.
+local function pairWorth(ctx, m, o)
+	local w = ctx.wornRec
+	return outfit(ctx, w[16], w[17], isDual(ctx, o and o.rec), m and m.rec, m and m.raw, o and o.rec, o and o.raw)
+end
+
+-- The best main hand and off hand that are two different items: main, off (either may be nil),
+-- and what they are worth together.
 local function bestPair(ctx, wornOnly, gone)
 	local best, bestMain, bestOff = nil, nil, nil
 	for i = 1, 2 do
@@ -337,37 +392,46 @@ local function bestPair(ctx, wornOnly, gone)
 		for j = 1, 2 do
 			local o = nth(ctx, "OFFHAND", j, nil, wornOnly, gone)
 			if not (m and o and m.item == o.item) and (m or o) then
-				local sum = scoreOf(m) + scoreOf(o)
+				local sum = pairWorth(ctx, m, o)
 				if best == nil or sum > best then best, bestMain, bestOff = sum, m, o end
 			end
 		end
 	end
-	return bestMain, bestOff
+	return bestMain, bestOff, best
 end
 
--- What the hands are worth today: the larger of the best two-hander and the best pair. Also
--- the pair's two entries and the two-hander's (any may be nil), and whether the two-hander is
--- the set in use.
+-- The hands: what the character can make of them today. Returns the set's worth in the outfit
+-- (the larger of the best two-hander and the best pair), the pair's entries, the two-hander's
+-- entry, whether the two-hander is the set in use, and the worth of the outfit with both hands
+-- empty (what is left of the hit's worth), which every weapon verdict measures from.
+local function handsNow(ctx, wornOnly, gone)
+	local w = ctx.wornRec
+	local empty = outfit(ctx, w[16], w[17], false)
+	local two = nth(ctx, "TWOHAND", 1, nil, wornOnly, gone)
+	local main, off, pair = bestPair(ctx, wornOnly, gone)
+	local twoWorth = two and outfit(ctx, w[16], w[17], false, two.rec, two.raw) or nil
+	local usingTwo = twoWorth ~= nil and (pair == nil or twoWorth >= pair)
+	local set = usingTwo and twoWorth or pair or empty
+	return set, main, off, two, usingTwo, empty
+end
+
+-- What the hands are worth today (measured from both hands empty), and the entries: the
+-- pair's main and off, the two-hander's, and whether the two-hander is the set in use.
 function Compare.SetValue(ctx)
-	local two = nth(ctx, "TWOHAND", 1)
-	local main, off = bestPair(ctx)
-	local pair = scoreOf(main) + scoreOf(off)
-	local usingTwo = two ~= nil and scoreOf(two) >= pair
-	return math.max(scoreOf(two), pair), main, off, two, usingTwo
+	local set, main, off, two, usingTwo, empty = handsNow(ctx)
+	return set - empty, main, off, two, usingTwo
 end
 
--- What a main hand and an off hand that are BOTH new are worth together, with the hit cap
--- counted over the two of them. mainValue and offValue are their scores for those hands
--- (Compare.HandScores); nil when the two cannot be held together (one unique-equipped item
--- twice).
+-- What a main hand and an off hand that are BOTH new are worth together, measured the same
+-- way (from both hands empty, the hit of the whole outfit counted under the caps the pair
+-- makes: an off-hand weapon means dual wielding). mainValue and offValue are their plain
+-- scores for those hands (Compare.HandScores); nil when the two cannot be held together (one
+-- unique-equipped item twice).
 function Compare.PairScore(ctx, mainRec, mainValue, offRec, offValue)
 	if mainRec.id == offRec.id and (mainRec.unique or offRec.unique) then return nil end
-	if not ctx.hit then return mainValue + offValue end
 	local w = ctx.wornRec
-	-- (The main hand goes on first; the off hand's hit counts in what room is left.)
-	local a = capped(ctx, mainRec, mainValue, w[16], w[17])
-	local b = capped(ctx, offRec, offValue, w[16], w[17], mainRec.stats)
-	return a + b
+	return outfit(ctx, w[16], w[17], isDual(ctx, offRec), mainRec, mainValue, offRec, offValue)
+		- outfit(ctx, w[16], w[17], false)
 end
 
 -- A usable weapon's raw scores for the hands it can go in: main, off, two (each nil when it
@@ -402,8 +466,11 @@ function Compare.Evaluate(rec, ctx, opts, out)
 	out.usable, out.reason, out.atLevel = usable, reason, atLevel
 	if not group then return out end
 
-	local score = Score.Value(rec.stats, ctx.weights)
-	local base, replaces
+	local raw = Score.Value(rec.stats, ctx.weights)
+	local score, base, replaces
+	-- (Every branch values two outfits, with and without the candidate, both measured from
+	-- the outfit with the place left empty: see THE HIT CAP in the header.)
+	local dualNow = ctx.hit ~= nil and ctx.hit.dual or false
 
 	if PAIR[group] then
 		local first = nth(ctx, group, 1, exclude, wornOnly)
@@ -417,60 +484,63 @@ function Compare.Evaluate(rec, ctx, opts, out)
 				replaces = second
 			end
 		end
-		base = scoreOf(replaces)
-		score = capped(ctx, rec, score, replaces and replaces.slot and replaces.rec or wornOf(ctx, group))
+		local kept = (replaces ~= nil and replaces == first) and second or first
+		local l1, l2 = wornOf(ctx, group)
+		local empty = outfit(ctx, l1, l2, dualNow, kept and kept.rec, kept and kept.raw)
+		score = outfit(ctx, l1, l2, dualNow, kept and kept.rec, kept and kept.raw, rec, raw) - empty
+		base = replaces and (outfit(ctx, l1, l2, dualNow, kept and kept.rec, kept and kept.raw, replaces.rec, replaces.raw) - empty) or 0
 	elseif WEAPONS[group] then
 		local gone = excludedItem(ctx, exclude)
-		local two = nth(ctx, "TWOHAND", 1, nil, wornOnly, gone)
-		local pairMain, pairOff = bestPair(ctx, wornOnly, gone)
-		local pair = scoreOf(pairMain) + scoreOf(pairOff)
-		local set = math.max(scoreOf(two), pair)
-		local usingTwo = two ~= nil and scoreOf(two) >= pair
-		-- base is what the candidate must beat ON ITS OWN, so that gain = (new set) - (old set):
-		--   two-hander:  new set = candidate               -> base = W
-		--   main hand:   new set = candidate + best off    -> base = W - best off
-		--   off hand:    new set = best main + candidate   -> base = W - best main
-		-- (The partner is the best owned item for the other hand: the candidate is a new item,
-		-- so any owned one may stand beside it.)
+		local set, pairMain, pairOff, two, usingTwo = handsNow(ctx, wornOnly, gone)
+		local w16, w17 = ctx.wornRec[16], ctx.wornRec[17]
 		-- (A unique-equipped candidate is never set beside an owned copy of itself.)
 		local notID = rec.unique and rec.id or nil
-		local worn = ctx.wornRec
 		if group == "TWOHAND" then
-			base = set
+			local empty = outfit(ctx, w16, w17, false)
+			score, base = outfit(ctx, w16, w17, false, rec, raw) - empty, set - empty
 			replaces = usingTwo and two or pairMain
-			score = capped(ctx, rec, score, worn[16], worn[17])
 		else
-			local asMain, asOff
-			local raw = score
+			-- The candidate beside the best owned item for the other hand (a new item: any owned
+			-- one may stand beside it), in the hand it can go in; a dual wielder's one-hander in
+			-- both, and the hand it gains more in stands (the main hand on a tie).
+			local mainScore, mainBase, offValue, offBase
 			if group == "MAINHAND" then
-				asMain = set - scoreOf(nth(ctx, "OFFHAND", 1, nil, wornOnly, gone, notID))
-				score = capped(ctx, rec, raw, worn[16])
+				local p = nth(ctx, "OFFHAND", 1, nil, wornOnly, gone, notID)
+				local dual = isDual(ctx, p and p.rec)
+				local empty = outfit(ctx, w16, w17, dual, nil, nil, p and p.rec, p and p.raw)
+				mainScore = outfit(ctx, w16, w17, dual, rec, raw, p and p.rec, p and p.raw) - empty
+				mainBase = set - empty
 			end
-			local off = raw
 			if group == "OFFHAND" or (rec.equipLoc == ONE_HAND and ctx.dual) then
-				if group == "MAINHAND" then off = offScore(rec, ctx.weights, raw) end
-				asOff = set - scoreOf(nth(ctx, "MAINHAND", 1, nil, wornOnly, gone, notID))
-				off = capped(ctx, rec, off, worn[17])
+				local asOff = group == "MAINHAND" and offScore(rec, ctx.weights, raw) or raw
+				local p = nth(ctx, "MAINHAND", 1, nil, wornOnly, gone, notID)
+				local empty = outfit(ctx, w16, w17, false, p and p.rec, p and p.raw)
+				offValue = outfit(ctx, w16, w17, isDual(ctx, rec), p and p.rec, p and p.raw, rec, asOff) - empty
+				offBase = set - empty
 			end
-			-- A dual wielder's one-hander: the hand it gains more in (the main hand on a tie).
-			if asMain and asOff and (off - asOff) > (score - asMain) then asMain = nil end
-			if asMain then
-				base = asMain
+			if mainScore and offValue and (offValue - offBase) > (mainScore - mainBase) then mainScore = nil end
+			if mainScore then
+				score, base = mainScore, mainBase
 				replaces = usingTwo and two or pairMain
 			else
-				score, base = off, asOff
+				score, base = offValue, offBase
 				replaces = usingTwo and two or pairOff
 				out.group, out.slot, out.offHand = "OFFHAND", Compare.SLOT_OF.OFFHAND, true
 			end
 		end
 	else
 		replaces = nth(ctx, group, 1, exclude, wornOnly)
-		base = scoreOf(replaces)
-		score = capped(ctx, rec, score, replaces and replaces.slot and replaces.rec or wornOf(ctx, group))
+		local l1 = wornOf(ctx, group)
+		local empty = outfit(ctx, l1, nil, dualNow)
+		score = outfit(ctx, l1, nil, dualNow, rec, raw) - empty
+		base = replaces and (outfit(ctx, l1, nil, dualNow, replaces.rec, replaces.raw) - empty) or 0
 	end
 
 	out.score, out.base, out.replaces = score, base, replaces and replaces.rec or nil
 	out.gain = score - base
+	-- (Two outfits that are the same must differ by exactly nothing: the sums above can leave
+	-- a remainder in the fifteenth digit, and "+0%" must not be listed as an upgrade.)
+	if out.gain > -1e-9 and out.gain < 1e-9 then out.gain = 0 end
 	out.empty = replaces == nil
 	local floor = (ctx.typical or 0) / 2
 	local over = math.max(base, floor)

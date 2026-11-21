@@ -19,10 +19,24 @@
 -- them be read; nothing of theirs is edited, hooked or copied):
 --   * Polestar (GPL-3): its settings "gear.bagArrows" (the upgrade arrow on bag items) and
 --     "gear.tooltip" (its gear line on tooltips) are registered defaults of its own (Polestar\
---     Gear\Gear.lua:104-110; read at Gear\Bags.lua:58), and its table is the global `Polestar`
---     with Get(path) and Set(path, value) (Core\Init.lua:11, :966, :1002). The owner's Addon
---     Skins hands settings of Polestar's over the same way (DaylightAddonSkins\Packs\
---     Polestar.lua:458-470). So: switched.
+--     Gear\Gear.lua:104-110; read at Gear\Bags.lua:58 and Gear\Tooltip.lua:157), and its
+--     table is the global `Polestar` with Get(path) and Set(path, value) (Core\Init.lua:11,
+--     :966, :1002). The owner's Addon Skins hands settings of Polestar's over the same way
+--     (DaylightAddonSkins\Packs\Polestar.lua:458-470). So: switched.
+--     ITS BAG ARROW DOES REACH DAYLIGHT UI'S BAGS. Polestar lists its bag views as the game's
+--     bags, Baganator, BagSmith and EllesmereUI Bags (Gear\Bags.lua:18-35), and for
+--     "Baganator" it registers a corner widget with whatever `_G.Baganator.API` offers
+--     RegisterCornerWidget (Core\BagSlots.lua:140-145, :155-168; Gear\Bags.lua:164, corner
+--     top left, priority 1). Daylight UI's bags put exactly that stand-in in place at load
+--     (DaylightUI_Bags\Plugins.lua:172-180, :199-213: `_G.Baganator = { DaylightUI = true,
+--     API = ... }`, "created at load, before other addons look for it"), and they load before
+--     Polestar (not load-on-demand; "DaylightUI_Bags" sorts before "Polestar"). It is the
+--     same call our own mark goes through. (The stage 2 audit read the comment's list and
+--     took Daylight UI's bags to be out of Polestar's reach; the registration path says
+--     otherwise. To be confirmed in play: design\in-game-check.md.)
+--   * A switch is taken only while ours really shows on that surface (Overlap.Ours) and is
+--     given back the moment it stops (our own switch off, Daylight UI's module off). No
+--     question is asked about a surface where ours does not show.
 --   * Pawn: Daylight UI itself draws Pawn's arrow in its bags while Pawn is loaded (DaylightUI_
 --     Bags\Plugins.lua:272-284, corner top left, priority 1). Pawn is not installed here and
 --     no switch of its own could be verified, so nothing of Pawn's is touched: with "ours"
@@ -92,13 +106,41 @@ local function Switch(rival, surface)
 	return nil
 end
 
+-- Whether OUR side of a surface is really on screen: there is an overlap only then.
+--   bags: Show Gear Advice and Bag Slots on, and Daylight UI's bags took our corner mark
+--         (Marks.shim: the mark is drawn nowhere else);
+--   tips: Show Gear Advice and Item Tooltips on, and Daylight UI's Tooltip module on (the row
+--         is added through it).
+function Overlap.Ours(surface)
+	if ns.Get("enabled") == false then return false end
+	if surface == "bags" then
+		return ns.Get("bagMarks") ~= false and type(ns.Marks) == "table" and ns.Marks.shim == true
+	end
+	if ns.Get("tooltips") == false then return false end
+	return not (type(ns.ModuleOff) == "function" and ns.ModuleOff("Tooltip"))
+end
+
+-- Who is loaded and where ours shows is worked out once and kept (a bag asks for every slot
+-- it paints): Overlap.Changed() forgets it, at login, when an addon loads, when a setting of
+-- ours changes.
+local known = {}
+function Overlap.Changed()
+	known.bags, known.tips = nil, nil
+end
+
+-- The other addons that do the same on a surface where ours shows: { { addon, name, can } }.
 function Overlap.Rivals(surface)
-	local out = {}
-	for _, rival in ipairs(RIVALS) do
-		if rival[surface] and Loaded(rival.addon) then
-			out[#out + 1] = { addon = rival.addon, name = rival.name, can = Switch(rival, surface) ~= nil }
+	local out = known[surface]
+	if out then return out end
+	out = {}
+	if Overlap.Ours(surface) then
+		for _, rival in ipairs(RIVALS) do
+			if rival[surface] and Loaded(rival.addon) then
+				out[#out + 1] = { addon = rival.addon, name = rival.name, can = Switch(rival, surface) ~= nil }
+			end
 		end
 	end
+	known[surface] = out
 	return out
 end
 
@@ -107,6 +149,10 @@ function Overlap.Yields(surface)
 	return #Overlap.Rivals(surface) > 0
 end
 
+-- DaylightGearDB.overlap = { asked = { ["Addon:surface"] = true },
+--                            took = { [character GUID] = { ["Addon:surface"] = its value before } } }
+-- What was taken is kept PER CHARACTER: Polestar's settings follow its own profiles, and a
+-- value taken on one character's profile must be put back there, not on another's.
 local function State()
 	local db = ns.DB()
 	if type(db.overlap) ~= "table" then db.overlap = {} end
@@ -116,25 +162,48 @@ local function State()
 	return o
 end
 
+local function Took(o)
+	local guid = ns.Game.Guid()
+	if not guid then return nil end
+	if type(o.took[guid]) ~= "table" then o.took[guid] = {} end
+	return o.took[guid]
+end
+
+-- Makes the other addons' switches follow: a switch is taken (turned off, its value kept)
+-- only while the question for it was answered, the answer is "ours", and ours really shows on
+-- that surface; in every other case what this character took is put back. Never in a fight
+-- (done a moment after it).
+local applySoon = false
 function Overlap.Apply()
+	if InCombatLockdown() then
+		if not applySoon then
+			applySoon = true
+			C_Timer.After(3, function()
+				applySoon = false
+				Overlap.Apply()
+			end)
+		end
+		return
+	end
 	local o = State()
+	local took = Took(o)
+	if not took then return end
 	for _, surface in ipairs(SURFACES) do
-		local ours = ns.Get(SETTING[surface]) ~= true
+		local ours = Overlap.Ours(surface) and ns.Get(SETTING[surface]) ~= true
 		for _, rival in ipairs(RIVALS) do
 			local get, set = nil, nil
 			if rival[surface] and Loaded(rival.addon) then get, set = Switch(rival, surface) end
 			if get then
 				local id = rival.addon .. ":" .. surface
-				-- (Only an answered question switches anything of another addon's.)
 				if ours and o.asked[id] then
 					local now = get()
 					if now ~= false then
-						if o.took[id] == nil then o.took[id] = now == nil and true or now end
+						if took[id] == nil then took[id] = now == nil and true or now end
 						set(false)
 					end
-				elseif not ours and o.took[id] ~= nil then
-					set(o.took[id])
-					o.took[id] = nil
+				elseif took[id] ~= nil then
+					if get() == false then set(took[id]) end
+					took[id] = nil
 				end
 			end
 		end
@@ -162,6 +231,7 @@ function Overlap.Choose(surface, theirs)
 	if type(ns.SetSetting) == "function" and (ns.Get(SETTING[surface]) == true) ~= (theirs and true or false) then
 		ns.SetSetting(SETTING[surface], theirs and true or false)
 	end
+	Overlap.Changed()
 	Overlap.Apply()
 end
 
@@ -332,12 +402,14 @@ end
 local FIRST, AGAIN, QUIET = 8, 3, 6
 if ns.me and type(ns.me.On) == "function" then
 	ns.me.On("Login", function()
-		-- (Twice: some addons read their settings a little after login.)
-		C_Timer.After(1, Overlap.Apply)
-		C_Timer.After(6, Overlap.Apply)
+		-- (Twice: some addons read their settings a little after login, and Daylight UI's bags
+		-- take our mark at login too.)
+		C_Timer.After(1, function() Overlap.Changed() Overlap.Apply() end)
+		C_Timer.After(6, function() Overlap.Changed() Overlap.Apply() end)
 		local waited, freeSince
 		local function ask()
 			if frame and frame:IsShown() then return end
+			Overlap.Changed()
 			if #Overlap.Unasked() == 0 then return end
 			if InCombatLockdown() or DaylightBusy() then
 				waited, freeSince = true, nil
@@ -358,11 +430,19 @@ if ns.me and type(ns.me.On) == "function" then
 	end)
 end
 
--- A change on the options page is an answer too.
+-- A change on the options page is an answer too; any setting of ours can change where ours
+-- shows, so the switches are looked at again.
 ns.On("Setting", function(path)
+	Overlap.Changed()
 	local surface = (path == "yieldBags" and "bags") or (path == "yieldTips" and "tips") or nil
-	if not surface then return end
-	local o = State()
-	for _, rival in ipairs(Overlap.Rivals(surface)) do o.asked[rival.addon .. ":" .. surface] = true end
+	if surface then
+		local o = State()
+		for _, rival in ipairs(Overlap.Rivals(surface)) do o.asked[rival.addon .. ":" .. surface] = true end
+	end
 	Overlap.Apply()
 end)
+
+-- An addon loaded later (load on demand): who is there is worked out again.
+local watcher = CreateFrame("Frame")
+pcall(watcher.RegisterEvent, watcher, "ADDON_LOADED")
+watcher:SetScript("OnEvent", Overlap.Changed)

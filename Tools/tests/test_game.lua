@@ -227,4 +227,65 @@ T.case("whether the game has an item, asked without making it fetch the item", f
 	T.eq(load().Time(), 0, "or 0 without it")
 end)
 
+T.case("hit that is not from ratings: the three calls, secret values, and a client without them", function()
+	GetHitModifier, GetRangedHitModifier, GetSpellHitModifier = nil, nil, nil
+	issecretvalue = nil
+	local G = load()
+	T.eq(G.HitModifiers(), nil, "without the calls: nothing")
+	GetHitModifier = function() return 3 end
+	GetSpellHitModifier = function() return 0 end
+	G = load()
+	local melee, ranged, spell = G.HitModifiers()
+	T.eq(melee, 3, "melee"); T.eq(ranged, 3, "no ranged call: the melee figure stands in"); T.eq(spell, 0, "spell")
+	GetRangedHitModifier = function() return 5 end
+	G = load()
+	_, ranged = G.HitModifiers()
+	T.eq(ranged, 5, "the ranged figure")
+	-- secret in a fight
+	local secret = {}
+	issecretvalue = function(v) return v == secret end
+	GetHitModifier = function() return secret end
+	G = load()
+	T.eq(G.HitModifiers(), nil, "a secret value: nothing, and nothing is compared or added")
+	GetHitModifier = function() error("boom") end
+	G = load()
+	T.eq(G.HitModifiers(), nil, "a call that raises: nothing")
+	GetHitModifier = function() return "3" end
+	G = load()
+	T.eq(G.HitModifiers(), nil, "not a number: nothing")
+	GetHitModifier, GetRangedHitModifier, GetSpellHitModifier, issecretvalue = nil, nil, nil, nil
+end)
+
+T.case("a quest's choices: count, link and stack size, as the game's own frame asks for them", function()
+	GetNumQuestChoices, GetQuestItemLink, GetQuestItemInfo = nil, nil, nil
+	local G = load()
+	local out = {}
+	T.eq(G.QuestChoices(out), 0, "without the calls: none")
+	local asked = {}
+	GetNumQuestChoices = function() return 3 end
+	GetQuestItemLink = function(kind, i)
+		asked[#asked + 1] = kind .. i
+		if i == 2 then return nil end
+		if i == 3 then return "" end
+		return "|Hitem:" .. i .. "|h[x]|h"
+	end
+	-- name, texture, count, quality, usable, itemID
+	GetQuestItemInfo = function(kind, i) return "x", 1, i == 1 and 5 or 0, 2, true, i end
+	G = load()
+	T.eq(G.QuestChoices(out), 3, "three choices")
+	T.eq(table.concat(asked, ","), "choice1,choice2,choice3", "asked as \"choice\", from 1")
+	T.eq(out[1].link, "|Hitem:1|h[x]|h", "a link"); T.eq(out[1].count, 5, "the third answer is the stack size")
+	T.eq(out[2].link, nil, "no link yet"); T.eq(out[3].link, nil, "an empty link is no link"); T.eq(out[2].count, 1, "a count of 0 reads as one")
+	GetNumQuestChoices = function() error("boom") end
+	G = load()
+	T.eq(G.QuestChoices({}), 0, "a call that raises: none")
+	GetNumQuestChoices = function() return 2 end
+	GetQuestItemLink = function() error("boom") end
+	GetQuestItemInfo = function() error("boom") end
+	G = load()
+	out = {}
+	T.eq(G.QuestChoices(out), 2, "links that raise: the count stands"); T.eq(out[1].link, nil, "and no link"); T.eq(out[1].count, 1, "one of it")
+	GetNumQuestChoices, GetQuestItemLink, GetQuestItemInfo = nil, nil, nil
+end)
+
 return T.done()

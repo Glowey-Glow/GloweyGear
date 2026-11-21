@@ -32,7 +32,8 @@
 -- frame while Daylight UI's window is up (Npc\Window.lua:36-45). A mark would mean reaching
 -- into Daylight UI's own table several times a second, which this plugin does not do.
 --
--- Never in a fight, never twice for one page, nothing for a quest with a single reward.
+-- Never in a fight, never twice for one page or for the same rewards within ten minutes,
+-- nothing for a quest with a single reward.
 --
 -- luacheck: read globals CreateFrame C_Timer
 
@@ -94,18 +95,43 @@ function Quest.Line(pick)
 	return L["No quest reward is an upgrade. %s sells for the most (%s)."]:format(pick.link, Money(pick.total))
 end
 
+-- THE CHOICES CAN COME LATE. Daylight UI's own notes on this client: "On a first visit the
+-- page arrives before its choices. GetNumQuestChoices reports 0 until they load" (DUI
+-- DaylightUI\Npc\Window.lua:210-216) and "A reward whose item isn't cached has no name yet,
+-- and QUEST_ITEM_UPDATE doesn't always follow" (:750-752). So a page is looked at again on
+-- QUEST_ITEM_UPDATE, when any item's data arrives (Core.lua's "ItemsArrived"), and on a
+-- timer of its own: every EVERY seconds, TRIES times at most, while fewer than two choices
+-- are there, a choice has no link yet, or a reward's stats are still loading. After that it
+-- speaks about what it has (a choice that never gets a link, a currency, is passed over) or,
+-- with fewer than two choices, gives the page up.
+local TRIES, EVERY = 12, 0.5
+-- The same rewards within this long are not spoken of twice (a page closed and opened again).
+local AGAIN = 600
+local spoken = nil   -- { sig = , at = Game.Time() }
+
+function Quest.Forget() spoken = nil end
+
+local function again()
+	if not page or page.timer then return end
+	local mine = page
+	page.timer = true
+	C_Timer.After(EVERY, function()
+		mine.timer = false
+		if page == mine then Quest.Look() end
+	end)
+end
+
 function Quest.Look()
 	if not page then return end
 	if ns.Get("enabled") == false or ns.Get("questPick") == false then return end
 	if Game.InCombat() then return end
 	for i = #buf, 1, -1 do buf[i] = nil end
-	local n = Game.QuestChoices(buf)
-	if not n or n < 2 then return end
-	local signature, pending = "", false
+	local n = Game.QuestChoices(buf) or 0
+	local signature, waiting = "", n < 2
 	for i = 1, n do
 		local it = buf[i]
 		if type(it.link) ~= "string" then
-			pending = true
+			waiting = true
 		else
 			signature = signature .. it.link .. ";"
 			local v, why = ns.Verdict(it.link)
@@ -114,23 +140,26 @@ function Quest.Look()
 				it.v = { usable = v.usable, gain = v.gain, pct = v.pct, far = v.far, empty = v.empty, group = v.group,
 					score = v.score, atLevel = v.atLevel, reason = v.reason, offHand = v.offHand, twoHand = v.twoHand }
 			elseif why == "pending" then
-				pending = true
+				waiting = true
 			end
 			local _, _, _, sellPrice = Game.ItemInfo(it.link)
 			it.sell = sellPrice
 		end
 	end
-	if pending then
-		-- Some reward is not loaded yet: looked at again when its data comes, a few times.
+	if waiting and (page.tries or 0) < TRIES then
 		page.tries = (page.tries or 0) + 1
-		if page.tries <= 10 then C_Timer.After(0.5, Quest.Look) end
-		return
+		return again()
 	end
-	if page.said == signature then return end
+	if n < 2 or page.said == signature then return end
 	page.said = signature
 	local pick = Quest.Choose(buf, ns.Get("minGain"), ns.Get("questSell") == true)
 	page.best = pick and pick.kind == "upgrade" and Stats.Key(pick.link) or nil
-	if pick then ns.Print(Quest.Line(pick)) end
+	if not pick then return end
+	-- (The same rewards as a moment ago: the page was closed and opened again.)
+	local now = Game.Time() or 0
+	if spoken and spoken.sig == signature and now - spoken.at < AGAIN then return end
+	spoken = { sig = signature, at = now }
+	ns.Print(Quest.Line(pick))
 end
 
 local frame = CreateFrame("Frame")
@@ -145,4 +174,7 @@ frame:SetScript("OnEvent", function(_, event)
 	elseif page then
 		Quest.Look()
 	end
+end)
+ns.On("ItemsArrived", function()
+	if page then Quest.Look() end
 end)

@@ -403,7 +403,7 @@ Step = function()
 			Paint()
 		end
 		-- (The list is whole: is there a better buy than the last time? Alert.lua.)
-		if ns.Alert and ns.Market.Saved() then ns.Alert.Check(S.view) end
+		if ns.Alert and ns.Market.Saved() then ns.Alert.Check(S.view, S.sig) end
 		return
 	end
 	-- The list fills in: only when what would be shown changed, not more than once a second,
@@ -563,7 +563,7 @@ local function Repriced()
 		S.pricedAt = S.painted
 		ns.Perf.Count("reprice")
 		Paint()
-		if ns.Alert then ns.Alert.Check(S.view) end
+		if ns.Alert then ns.Alert.Check(S.view, S.sig) end
 	end)
 end
 
@@ -846,7 +846,7 @@ local function FillRow(r, e, y, C)
 	r.icon:SetSize(size, size)
 	r.icon:SetTexture(Icon(ns.Stats.ItemID(row.link)) or 134400)   -- (134400: the game's question mark)
 	-- (A pair's two items say which hand they are for; the pair's own row has the gain.)
-	r.gain:SetText(row.label or (Window.GainText(row) .. ((not row.isSet and Window.Uncounted(row, S.tips)) and " *" or "")))
+	r.gain:SetText((row.label or Window.GainText(row)) .. ((not row.isSet and Window.Uncounted(row, S.tips)) and " *" or ""))
 	ink(r.gain, C.GOOD)
 	r.price:SetText(Money(row.price))
 	ink(r.price, C.VALUE)
@@ -987,11 +987,20 @@ local MODES = { perGold = L["Most per Gold"], biggest = L["Biggest Gain"] }
 -- alternatives): what Check Prices asks about.
 function Window.ShownItems()
 	local ids, seen = {}, {}
-	for _, e in ipairs(S.model) do
-		local id = ns.Stats.ItemID(e.row.link)
+	local function add(link)
+		local id = ns.Stats.ItemID(link)
 		if id and not seen[id] then
 			seen[id] = true
 			ids[#ids + 1] = id
+		end
+	end
+	for _, e in ipairs(S.model) do
+		-- (A pair's own row stands for two items, shown or not.)
+		if e.row.isSet then
+			add(e.row.main.link)
+			add(e.row.off.link)
+		else
+			add(e.row.link)
 		end
 	end
 	return ids

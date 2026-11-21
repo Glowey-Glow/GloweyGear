@@ -707,4 +707,66 @@ T.case("the hit cap counts over the pair", function()
 	T.near(set.gain, 50 + 15 + 20 - 60, "damage, Strength and 2% of hit; the other 2% is over the cap")
 end)
 
+T.case("L1: a two-hander pick is not added to the Off Hand pick", function()
+	T.reset()
+	-- mace (20) and shield (10) worn: 30. For sale: a two-hander (+30), a shield (+10 alone), and a
+	-- mace that with that shield is +35. The two picks cannot be held together: the pair beats the
+	-- two-hander and must be said.
+	local job = Rank.Job(hands("WARRIOR", { [16] = arm("INVTYPE_WEAPON", 10), [17] = shield(10) }), OPTS)
+	job:Add(arm("INVTYPE_2HWEAPON", 30, { name = "Big" }), 9 * GOLD)          -- 60: +30
+	job:Add(shield(20, { name = "Board" }), 1 * GOLD)                        -- +10 alone
+	job:Add(arm("INVTYPE_WEAPON", 22.5, { name = "Mace" }), 30 * GOLD)       -- 45: +25 alone, dear; with Board 65: +35
+	job:Run()
+	local view = job.live:View(job.rows)
+	T.eq(view.groups.MAINHAND[1].name, "Big", "the two-hander is the Main Hand pick (most per gold)")
+	T.eq(view.groups.OFFHAND[1].name, "Board", "the shield is the Off Hand pick")
+	local set = Rank.Set(job, OPTS, view)
+	T.check(set ~= nil, "the pair gains 35, the two-hander 30, the shield 10: the pair is said")
+	T.near(set and set.gain or 0, 35, "its gain")
+end)
+
+T.case("L2: only the weapons in the short lists are remembered", function()
+	T.reset()
+	local job = Rank.Job(hands("WARRIOR", { [16] = arm("INVTYPE_2HWEAPON", 30) }), OPTS)
+	for i = 1, 300 do job:Add(arm("INVTYPE_WEAPON", i / 100, { name = "S" .. i }), (1 + i) * GOLD) end
+	job:Run()
+	local n = 0
+	for _ in pairs(job.hands.byKey) do n = n + 1 end
+	T.check(n <= 4 * Rank.HAND_KEEP, "at most the four short lists' entries are kept, of 300 (" .. n .. ")")
+end)
+
+T.case("M1 and M3 for pairs: an identical pair is no upgrade; a pair that starts dual wielding gets the cap it makes", function()
+	T.reset()
+	local w = { STR = 1, MH_DPS = 2, OH_DPS = 1, HIT = 10 }
+	local function harm(loc, dps, pct, more)
+		local def = { equipLoc = loc, classID = 2, subclassID = (loc == "INVTYPE_2HWEAPON") and 8 or 7,
+			raw = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = dps, ITEM_MOD_HIT_MELEE_RATING_SHORT = pct * 10 } }
+		for k, v in pairs(more or {}) do def[k] = v end
+		return T.item(def)
+	end
+	local function hshield(str, pct, name)
+		return T.item({ equipLoc = "INVTYPE_SHIELD", classID = 4, subclassID = 6, name = name,
+			raw = { ITEM_MOD_STRENGTH_SHORT = str, ITEM_MOD_HIT_MELEE_RATING_SHORT = pct * 10 } })
+	end
+	local chest = T.item({ equipLoc = "INVTYPE_CHEST", classID = 4, subclassID = 0, raw = { ITEM_MOD_HIT_MELEE_RATING_SHORT = 70 } })
+	-- (A paladin: no dual wield, so the sword cannot also be tried in the off hand.)
+	local ctx = Compare.Context({ class = "PALADIN", level = 60, weights = w },
+		{ [16] = harm("INVTYPE_WEAPON", 10, 1), [17] = hshield(5, 1), [5] = chest }, {})
+	local job = Rank.Job(ctx, OPTS)
+	job:Add(harm("INVTYPE_WEAPON", 10, 1, { name = "Same Sword" }), GOLD); job:Add(hshield(5, 1, "Same Board"), GOLD)
+	job:Run()
+	T.eq(#job.rows, 0, "neither is an upgrade alone")
+	T.eq(Rank.Set(job, OPTS, job.live:View(job.rows)), nil, "M1: the very pair that is worn, for sale, is not an upgrade together")
+	-- M3: a two-hand wearer with 12% hit; two one-handers make a dual wielder of a rogue
+	T.reset()
+	chest = T.item({ equipLoc = "INVTYPE_CHEST", classID = 4, subclassID = 0, raw = { ITEM_MOD_HIT_MELEE_RATING_SHORT = 120 } })
+	ctx = Compare.Context({ class = "ROGUE", level = 60, weights = w }, { [16] = harm("INVTYPE_2HWEAPON", 20, 0, { subclassID = 7 }), [5] = chest }, {})
+	job = Rank.Job(ctx, OPTS)
+	job:Add(harm("INVTYPE_WEAPON", 15, 0, { name = "A" }), GOLD); job:Add(harm("INVTYPE_WEAPON", 14, 0, { name = "B" }), GOLD)
+	job:Run()
+	local set = Rank.Set(job, OPTS, job.live:View(job.rows))
+	T.check(set ~= nil, "a pair")
+	T.near(set and set.gain or 0, 30 + 14 + 4 * 10 * Compare.DUAL_SHARE - 40, "M3: dual wielding, the 4% past 8 counts again at the dual share")
+end)
+
 return T.done()

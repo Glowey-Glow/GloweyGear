@@ -289,16 +289,37 @@ local function handThrift(a, b)
 end
 
 -- Puts `e` in a list kept in `order`, HAND_KEEP long.
+-- Returns whether it went in, and the entry it pushed out (or nil).
 local function handInto(list, e, order)
 	local n = #list
-	if n >= HAND_KEEP and not order(e, list[n]) then return end
+	if n >= HAND_KEEP and not order(e, list[n]) then return false end
 	local at = n + 1
 	while at > 1 and order(e, list[at - 1]) do
 		list[at] = list[at - 1]
 		at = at - 1
 	end
 	list[at] = e
-	if n + 1 > HAND_KEEP then list[n + 1] = nil end
+	local out
+	if n + 1 > HAND_KEEP then
+		out = list[n + 1]
+		list[n + 1] = nil
+	end
+	return true, out
+end
+
+-- The same, with hands.byKey kept to the entries that are in a list: an entry counts the
+-- lists it is in (`n`) and leaves byKey when the last one drops it. (A house's every usable
+-- weapon was kept there before: 600 entries for 300 one-handers.)
+local function handKeep(hands, list, e, order)
+	local went, out = handInto(list, e, order)
+	if went then
+		e.n = (rawget(e, "n") or 0) + 1
+		hands.byKey[e.bk] = e
+	end
+	if out then
+		out.n = out.n - 1
+		if out.n <= 0 then hands.byKey[out.bk] = nil end
+	end
 end
 
 function Rank.Set(job, opts, view)
@@ -352,11 +373,17 @@ function Rank.Set(job, opts, view)
 	best.value = Rank.Value(best.gain, best.price, opts.level)
 	-- Said only when it tells more than the list's own two rows do.
 	local groups = view and view.groups or {}
-	local apart = 0
+	local apart, twoHandPick = 0, false
 	for _, group in ipairs({ "MAINHAND", "OFFHAND" }) do
 		local pick = groups[group] and groups[group][1]
-		-- (A two-hander as the Main Hand pick leaves no hand for the other pick.)
-		if pick and pick.twoHand then apart = math.max(apart, pick.gain) elseif pick then apart = apart + pick.gain end
+		-- (A two-hander as the Main Hand pick leaves no hand for the Off Hand pick: the two
+		-- cannot be held together, so the pair has to beat each of them, not their sum.)
+		if pick and (pick.twoHand or twoHandPick) then
+			apart = math.max(apart, pick.gain)
+			twoHandPick = true
+		elseif pick then
+			apart = apart + pick.gain
+		end
 	end
 	if best.gain <= apart + 1e-6 then return nil end
 	return best
@@ -444,7 +471,8 @@ local function one(self, link, price)
 		-- (A price a search confirmed is newer than any listing of the list: it stands.)
 		if price < known and not (row and row.checkedAt) then
 			self.cheapest[key] = price
-			local hand = self.hands.byKey[key]
+			local off = self.hands.byKey[key .. "#off"]
+			local hand = self.hands.byKey[key] or (off and getmetatable(off).__index) or nil
 			if hand and not hand.checkedAt then hand.price = price end
 			if row then
 				row.price, row.link = price, link
@@ -489,23 +517,23 @@ local function one(self, link, price)
 		local hands = self.hands
 		local pocket = Rank.Pocket(self.ctx.level)
 		-- (Of the record only what a pair needs is kept: the record itself is not held.)
-		local e = { key = key, link = link, name = rec.name, quality = rec.quality, price = price, main = asMain, off = asOff,
-			rec = { id = rec.id, unique = rec.unique, stats = { HIT = rec.stats.HIT, SPELL_HIT = rec.stats.SPELL_HIT } },
-			checkedAt = self.checked[link] }
-		hands.byKey[key] = e
+		-- (classID: an off-hand WEAPON means dual wielding, which changes the hit cap.)
+		local e = { key = key, bk = key, n = 0, link = link, name = rec.name, quality = rec.quality, price = price,
+			main = asMain, off = asOff, checkedAt = self.checked[link],
+			rec = { id = rec.id, unique = rec.unique, classID = rec.classID,
+				stats = { HIT = rec.stats.HIT, SPELL_HIT = rec.stats.SPELL_HIT } } }
 		local gold = math.max(price, pocket) / 10000
 		if asMain and asMain > 0 then
 			e.score, e.thrift = asMain, asMain / gold
-			handInto(hands.main, e, handBetter)
-			handInto(hands.mainThrift, e, handThrift)
+			handKeep(hands, hands.main, e, handBetter)
+			handKeep(hands, hands.mainThrift, e, handThrift)
 		end
 		if asOff and asOff > 0 then
 			-- (A one-hander is in both hands' lists: its own entry for the off hand.)
-			local o = asMain and setmetatable({ score = asOff, thrift = asOff / gold }, { __index = e }) or e
+			local o = asMain and setmetatable({ score = asOff, thrift = asOff / gold, bk = key .. "#off", n = 0 }, { __index = e }) or e
 			if o == e then e.score, e.thrift = asOff, asOff / gold end
-			if o ~= e then hands.byKey[key .. "#off"] = o end
-			handInto(hands.off, o, handBetter)
-			handInto(hands.offThrift, o, handThrift)
+			handKeep(hands, hands.off, o, handBetter)
+			handKeep(hands, hands.offThrift, o, handThrift)
 		end
 	end
 	-- Never listed: what is no better than what is owned. (A gain that is not a number, from
@@ -530,12 +558,12 @@ end
 -- may Add it).
 function Job:Reprice(key, copper, at)
 	-- (A weapon remembered for a pair: its price and whether it is still for sale.)
-	local hand = self.hands.byKey[key]
+	local off = self.hands.byKey[key .. "#off"]
+	-- (The off-hand entry of a one-hander reads price and `gone` through its main entry.)
+	local hand = self.hands.byKey[key] or (off and getmetatable(off).__index) or nil
 	if hand then
 		if copper > 0 then hand.price, hand.gone = copper, nil else hand.gone = true end
 		hand.checkedAt = at
-		local off = self.hands.byKey[key .. "#off"]
-		if off then off.gone = rawget(hand, "gone") end
 		self.live.changed = true
 	end
 	local row = self.byKey[key]

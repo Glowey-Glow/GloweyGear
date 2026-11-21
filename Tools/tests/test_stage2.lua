@@ -93,6 +93,7 @@ T.case("a quest's reward page: one line, once, never in a fight", function()
 	w.fire("QUEST_FINISHED")
 	T.eq(Quest.Best(), nil, "the page closed: no pick")
 	-- a reward not loaded yet: said when it has arrived
+	Quest.Forget()
 	WORLD.items[T_ident(big)].loaded = false
 	Stats.Forget()
 	w.fire("QUEST_COMPLETE")
@@ -101,6 +102,12 @@ T.case("a quest's reward page: one line, once, never in a fight", function()
 	T.load(big)
 	w.advance(1)
 	T.eq(#w.chat, lines + 2, "then the line")
+	w.fire("QUEST_FINISHED")
+	local before = #w.chat
+	w.fire("QUEST_COMPLETE")
+	w.advance(1)
+	T.eq(#w.chat, before, "L8: the same page opened again says nothing new")
+	Quest.Forget()
 	w.fire("QUEST_FINISHED")
 	-- in a fight: nothing
 	WORLD.combat = true
@@ -201,60 +208,174 @@ end)
 -- ---------------------------------------------------------------------------------------------
 -- Other addons
 -- ---------------------------------------------------------------------------------------------
-T.case("who else marks upgrades, and whose switch is flipped", function()
+-- (Daylight UI's modules, and whether its bags took our corner mark: what "ours shows" depends on.)
+local modules = {}
+NS.API.IsModuleEnabled = function(name) return modules[name] ~= false end
+local loadedAsks = 0
+rawset(_G, "C_AddOns", { IsAddOnLoaded = function(name)
+	loadedAsks = loadedAsks + 1
+	return addons[name] == true
+end })
+local function polestar(theirs, counter)
+	rawset(_G, "Polestar", { Get = function(path) return theirs[path] end, Set = function(path, value)
+		counter.n = counter.n + 1
+		-- (As Polestar stores it: a value equal to its default is kept as nil.)
+		if value == true then theirs[path] = nil else theirs[path] = value end
+	end })
+end
+local function fresh()
 	T.reset()
 	character()
 	DaylightGearDB.overlap = nil
-	addons = {}
+	addons, modules = {}, {}
+	NS.Marks.shim = true
+	w.set("yieldBags", false); w.set("yieldTips", false); w.set("tooltips", true); w.set("bagMarks", true); w.set("enabled", true)
+	DaylightGearDB.overlap = nil
+	Overlap.Changed()
+end
+local function on(v) return v == nil or v == true end   -- Polestar's default is on
+
+T.case("who else marks upgrades, and whose switch is flipped", function()
+	fresh()
 	T.eq(#Overlap.Rivals("bags"), 0, "no other addon: no rival"); T.eq(#Overlap.Unasked(), 0, "nothing to ask")
 	w.set("yieldBags", true)
 	T.eq(Overlap.Yields("bags"), false, "with no rival ours never stands down, whatever the setting")
-	w.set("yieldBags", false)
-	DaylightGearDB.overlap = nil
-
-	local theirs = { ["gear.bagArrows"] = true, ["gear.tooltip"] = true, ["gear.rewards"] = true }
-	local sets = 0
-	rawset(_G, "Polestar", { Get = function(path) return theirs[path] end, Set = function(path, value) sets = sets + 1; theirs[path] = value end })
+	fresh()
+	local theirs, sets = { ["gear.rewards"] = true }, { n = 0 }
+	polestar(theirs, sets)
 	addons = { Polestar = true, Pawn = true, CheapUpgrades = true }
+	Overlap.Changed()
 	local bags, tips = Overlap.Rivals("bags"), Overlap.Rivals("tips")
-	T.eq(#bags, 2, "Polestar and Pawn mark bags"); T.eq(#tips, 3, "all three add to tooltips")
-	T.eq(bags[1].name, "Polestar", "Polestar"); T.eq(bags[1].can, true, "has a switch we may flip"); T.eq(bags[2].can, false, "Pawn has none")
+	T.eq(#bags, 2, "Polestar and Pawn mark Daylight UI's bags (Polestar through the Baganator-style call)")
+	T.eq(bags[1].name, "Polestar", "Polestar"); T.eq(bags[1].can, true, "has a switch"); T.eq(bags[2].can, false, "Pawn has none")
+	T.eq(#tips, 3, "all three add to tooltips"); T.eq(tips[1].name, "Polestar", "Polestar"); T.eq(tips[1].can, true, "has a switch we may flip")
 	T.eq(table.concat(Overlap.Unasked(), ","), "bags,tips", "both surfaces are to be asked about")
-	-- before an answer nothing of another addon's is touched
 	Overlap.Apply()
-	T.eq(sets, 0, "not answered yet: Polestar's settings are left alone")
-	T.eq(Overlap.Yields("bags"), false, "ours shows by default")
-	T.check(Overlap.What("bags"):find("Polestar", 1, true) and Overlap.What("bags"):find("Pawn", 1, true), "the row names them: " .. Overlap.What("bags"))
-	-- the answer "ours" for bags
+	T.eq(sets.n, 0, "not answered yet: Polestar's settings are left alone")
+	T.check(Overlap.What("tips"):find("Polestar", 1, true) and Overlap.What("tips"):find("Pawn", 1, true), "the row names them: " .. Overlap.What("tips"))
+	-- the answer "ours" for bags, with our mark really in Daylight UI's bags
 	Overlap.Choose("bags", false)
-	T.eq(theirs["gear.bagArrows"], false, "ours: Polestar's bag arrows are switched off")
-	T.eq(theirs["gear.tooltip"], true, "its tooltip line is another question: untouched")
-	T.eq(theirs["gear.rewards"], true, "and nothing else of Polestar's")
-	T.eq(table.concat(Overlap.Unasked(), ","), "tips", "bags are answered")
-	-- reversed: theirs
-	Overlap.Choose("bags", true)
-	T.eq(theirs["gear.bagArrows"], true, "theirs: Polestar's arrows are put back as they were")
-	T.eq(Overlap.Yields("bags"), true, "and ours stands down")
-	T.eq(w.settings.DaylightGear.yieldBags, true, "the setting follows")
-	-- and back again through the options page
-	w.set("yieldBags", false)
-	T.eq(theirs["gear.bagArrows"], false, "the options page reverses it again")
-	-- a value the player had already switched off is not turned on when ours yields
-	theirs["gear.tooltip"] = false
+	T.eq(theirs["gear.bagArrows"], false, "ours on bags: Polestar's bag arrows are switched off")
+	T.eq(on(theirs["gear.tooltip"]), true, "its tooltip line is another question: untouched")
+	-- M5: without Daylight UI's bags our mark is nowhere, so Polestar's arrows are given back
+	NS.Marks.shim = false
+	Overlap.Changed(); Overlap.Apply()
+	T.eq(on(theirs["gear.bagArrows"]), true, "M5: our mark does not show (no Daylight UI bags): Polestar keeps its arrows")
+	NS.Marks.shim = true
+	Overlap.Changed(); Overlap.Apply()
+	T.eq(theirs["gear.bagArrows"], false, "with them back, taken again")
+	w.set("bagMarks", false)
+	T.eq(on(theirs["gear.bagArrows"]), true, "M5: our Bag Slots switch off: Polestar keeps its arrows")
+	w.set("bagMarks", true)
+	-- "ours" for tooltips
 	Overlap.Choose("tips", false)
+	T.eq(theirs["gear.tooltip"], false, "ours: Polestar's tooltip line is switched off")
+	T.eq(theirs["gear.rewards"], true, "and nothing else of Polestar's")
+	T.eq(#Overlap.Unasked(), 0, "everything answered")
+	-- reversed: theirs
 	Overlap.Choose("tips", true)
+	T.eq(on(theirs["gear.tooltip"]), true, "theirs: Polestar's line is put back as it was")
+	T.eq(Overlap.Yields("tips"), true, "and ours stands down"); T.eq(w.settings.DaylightGear.yieldTips, true, "the setting follows")
+	w.set("yieldTips", false)
+	T.eq(theirs["gear.tooltip"], false, "the options page reverses it again")
+	-- a value the player had already switched off is not turned on when ours yields
+	fresh()
+	theirs, sets = { ["gear.tooltip"] = false }, { n = 0 }
+	polestar(theirs, sets)
+	addons = { Polestar = true }
+	Overlap.Changed()
+	Overlap.Choose("tips", false); Overlap.Choose("tips", true)
 	T.eq(theirs["gear.tooltip"], false, "what the player had off stays off")
-	T.eq(#Overlap.Unasked(), 0, "everything answered: not asked again")
 	-- a new rival on a surface asks again
 	addons.ForeverLevelingBiS = true
+	Overlap.Changed()
 	T.eq(table.concat(Overlap.Unasked(), ","), "bags,tips", "a new addon is a new question")
 	-- a Polestar whose table is not as read: no switch, never an error
 	rawset(_G, "Polestar", { Get = "no" })
-	T.eq(Overlap.Rivals("bags")[1].can, false, "Polestar without its Get and Set: treated as having no switch")
+	Overlap.Changed()
+	T.eq(Overlap.Rivals("tips")[1].can, false, "Polestar without its Get and Set: treated as having no switch")
 	Overlap.Apply()
 	rawset(_G, "Polestar", false)
-	addons = {}
-	w.set("yieldTips", false); w.set("yieldBags", false)
+end)
+
+T.case("M5: another addon's switch is taken only while ours really shows there", function()
+	fresh()
+	local theirs, sets = {}, { n = 0 }
+	polestar(theirs, sets)
+	addons = { Polestar = true, Pawn = true }
+	Overlap.Changed()
+	Overlap.Choose("tips", false)
+	T.eq(theirs["gear.tooltip"], false, "ours shows on tooltips: Polestar's line is off")
+	-- our own tooltip row switched off: Polestar's line comes back, and nothing is asked
+	w.set("tooltips", false)
+	T.eq(on(theirs["gear.tooltip"]), true, "our Item Tooltips off: Polestar's line is given back")
+	T.eq(#Overlap.Rivals("tips"), 0, "no overlap on a surface where ours does not show")
+	w.set("tooltips", true)
+	T.eq(theirs["gear.tooltip"], false, "on again: taken again (the question was answered)")
+	-- Daylight UI's Tooltip module off: the same
+	modules.Tooltip = false
+	Overlap.Changed(); Overlap.Apply()
+	T.eq(on(theirs["gear.tooltip"]), true, "Daylight UI's tooltips off: given back")
+	modules.Tooltip = nil
+	Overlap.Changed(); Overlap.Apply()
+	T.eq(theirs["gear.tooltip"], false, "and taken when they are on again")
+	-- Show Gear Advice off: everything is given back and nothing is asked
+	w.set("enabled", false)
+	T.eq(on(theirs["gear.tooltip"]), true, "Show Gear Advice off: given back")
+	DaylightGearDB.overlap.asked = {}
+	T.eq(#Overlap.Unasked(), 0, "L10: with Gear Advice off no question is asked")
+	w.set("enabled", true)
+	-- bags: no mark of ours without Daylight UI's bags, so no overlap there
+	T.eq(#Overlap.Rivals("bags"), 2, "with Daylight UI's bags: Polestar and Pawn are rivals")
+	NS.Marks.shim = false
+	Overlap.Changed()
+	T.eq(#Overlap.Rivals("bags"), 0, "without them our mark is nowhere: no rival, no question")
+	NS.Marks.shim = true
+	Overlap.Changed()
+	-- never in a fight
+	DaylightGearDB.overlap = nil
+	theirs["gear.tooltip"] = nil
+	Overlap.Changed()
+	local before = sets.n
+	WORLD.combat = true
+	Overlap.Choose("tips", false)
+	T.eq(sets.n, before, "L10: nothing of another addon's is switched in a fight")
+	WORLD.combat = false
+	w.advance(4)
+	T.eq(theirs["gear.tooltip"], false, "it is done when the fight is over")
+	rawset(_G, "Polestar", false)
+end)
+
+T.case("L9: what was taken is remembered per character; L11: asking whether ours yields is cheap", function()
+	fresh()
+	-- character A, Polestar profile X
+	local x, y, sets = {}, {}, { n = 0 }
+	polestar(x, sets)
+	addons = { Polestar = true }
+	Overlap.Changed()
+	Overlap.Choose("tips", false)
+	T.eq(x["gear.tooltip"], false, "A: profile X switched off")
+	-- character B, Polestar profile Y
+	WORLD.guid = "Player-4407-00BBBBBB"
+	polestar(y, sets)
+	Overlap.Changed(); Overlap.Apply()
+	T.eq(y["gear.tooltip"], false, "B: profile Y switched off too")
+	Overlap.Choose("tips", true)
+	T.eq(on(y["gear.tooltip"]), true, "B reverses: Y is put back")
+	-- A logs in again: X must be put back as well
+	WORLD.guid = "Player-4407-00ABCDEF"
+	polestar(x, sets)
+	Overlap.Changed(); Overlap.Apply()
+	T.eq(on(x["gear.tooltip"]), true, "A's profile X is put back when A next logs in, not left off for good")
+	-- cheap
+	addons.Pawn = true
+	w.set("yieldBags", true)
+	Overlap.Changed()
+	T.eq(Overlap.Yields("bags"), true, "ours yields on bags")
+	loadedAsks = 0
+	for _ = 1, 500 do Overlap.Yields("bags") end
+	T.eq(loadedAsks, 0, "500 bag slots ask nothing of the game and build nothing: the answer is kept")
+	rawset(_G, "Polestar", false)
 end)
 
 T.case("ours stands down on the surface the player gave away", function()
@@ -268,11 +389,13 @@ T.case("ours stands down on the surface the player gave away", function()
 	NS.Marks.OnItemTooltip(lines, { link = better })
 	T.eq(#rows, 1, "the tooltip row is there")
 	addons = { Pawn = true }
+	Overlap.Changed()
 	w.set("yieldTips", true)
 	rows = {}
 	NS.Marks.OnItemTooltip(lines, { link = better })
 	T.eq(#rows, 0, "tooltips left to another addon: no row of ours")
 	addons = {}
+	Overlap.Changed()
 	rows = {}
 	NS.Marks.OnItemTooltip(lines, { link = better })
 	T.eq(#rows, 1, "that addon is gone: ours is back without a change of setting")
@@ -354,6 +477,136 @@ T.case("from a saved list to the window: the pair is found and shown, and a new 
 	T.check(said():find("Best Vest", 1, true), "naming it: " .. said())
 	ah.open = false
 	w.fire("AUCTION_HOUSE_CLOSED")
+end)
+
+T.case("M4: choices that arrive late, with no event; L8: a page reopened, and a choice with no link", function()
+	T.reset()
+	character()
+	Quest.Forget()
+	WORLD.worn[5] = gear({ name = "Worn Vest", raw = str(10) })
+	local small, big = gear({ name = "Small", raw = str(12) }), gear({ name = "Big", raw = str(20) })
+	w.dui("Login")
+	-- the page arrives before its choices (count 0), and no QUEST_ITEM_UPDATE follows
+	WORLD.quest = {}
+	local lines = #w.chat
+	w.fire("QUEST_COMPLETE")
+	w.advance(1)
+	T.eq(#w.chat, lines, "no choices yet: nothing to say")
+	WORLD.quest = { { link = small }, { link = big } }
+	w.advance(1.5)
+	T.eq(#w.chat, lines + 1, "the choices came late and with no event: the line still comes")
+	T.check(said():find("Big", 1, true), "naming the best: " .. said())
+	-- the look does not go on for ever on a page with no choice
+	w.fire("QUEST_FINISHED")
+	WORLD.quest = {}
+	w.fire("QUEST_COMPLETE")
+	w.advance(30)
+	local looks = WORLD.calls.QuestChoices
+	w.advance(30)
+	T.eq(WORLD.calls.QuestChoices, looks, "a page with no choice is given up after a few seconds")
+	w.fire("QUEST_FINISHED")
+	-- the same page opened again: not said twice
+	WORLD.quest = { { link = small }, { link = big } }
+	w.fire("QUEST_COMPLETE")
+	w.advance(2)
+	T.eq(#w.chat, lines + 1, "the same rewards again: the line is not repeated")
+	T.eq(Quest.Best(), Stats.Key(big), "but the tooltip still knows the pick")
+	w.fire("QUEST_FINISHED")
+	-- a choice that never gets a link (a currency) does not silence the page
+	local other, best = gear({ name = "Other", raw = str(13) }), gear({ name = "Best", raw = str(30) })
+	WORLD.quest = { { link = other }, { link = nil }, { link = best } }
+	w.fire("QUEST_COMPLETE")
+	w.advance(12)
+	T.eq(#w.chat, lines + 2, "the two real items are still compared")
+	T.check(said():find("Best", 1, true), "and the best of them named: " .. said())
+	w.fire("QUEST_FINISHED")
+end)
+
+T.case("L7: no news after a change of settings or of what is owned; news inside the quiet minute is kept", function()
+	T.reset()
+	character()
+	Alert.Reset()
+	local c = NS.Char()
+	c.seen = nil
+	WORLD.clock = 9000000
+	local lines = #w.chat
+	local a, b = row("1", 10, 2, "HEAD"), row("2", 30, 3, "HEAD")
+	Alert.Check(view({ HEAD = { a } }), "owned-1")
+	-- Max Price raised: a dearer, better item becomes the pick. It was for sale all along.
+	w.set("maxPrice", 500)
+	Alert.Check(view({ HEAD = { b } }), "owned-1")
+	T.eq(#w.chat, lines, "after a Max Price change the new pick is not news")
+	w.set("minGain", 1)
+	Alert.Check(view({ HEAD = { row("3", 40, 4, "HEAD") } }), "owned-1")
+	T.eq(#w.chat, lines, "nor after a Smallest Gain change")
+	-- what is owned changed (a piece sold or banked)
+	Alert.Check(view({ HEAD = { row("4", 50, 5, "HEAD") } }), "owned-2")
+	T.eq(#w.chat, lines, "nor after a change of what is owned")
+	-- real news
+	Alert.Check(view({ HEAD = { row("5", 60, 6, "HEAD") } }), "owned-2")
+	T.eq(#w.chat, lines + 1, "the same settings and gear, a better item: news")
+	-- a second piece of news inside the quiet minute is held, and said when the minute is over
+	Alert.Check(view({ HEAD = { row("5", 60, 6, "HEAD") }, LEGS = { row("6", 20, 7, "LEGS") } }), "owned-2")
+	T.eq(#w.chat, lines + 1, "inside the minute: not yet")
+	WORLD.clock = WORLD.clock + 61000
+	w.advance(62)
+	T.eq(#w.chat, lines + 2, "the minute over: the news that was held is said")
+	T.check(said():find("|Hitem:6|h", 1, true), "it is the held one: " .. said())
+	w.set("maxPrice", 50); w.set("minGain", 3)
+end)
+
+T.case("L12: Check Prices asks about both items of a pair; a pair's item with an uncounted effect is marked", function()
+	local m = { key = "1001", link = "item:1001", name = "Sword", quality = 2, price = 300 }
+	local o = { key = "1002", link = "item:1002", name = "Board", quality = 2, price = 200 }
+	Window.S.model = Window.Model({ groups = {} }, nil, { main = m, off = o, gain = 5, price = 500, pct = 8 })
+	local ids = Window.ShownItems()
+	table.sort(ids)
+	T.eq(table.concat(ids, ","), "1001,1002", "both items of the closed pair row are checked")
+	Window.S.model = {}
+end)
+
+T.case("the overlap window is built from Daylight UI's widgets and filled", function()
+	fresh()
+	addons = { Pawn = true }
+	Overlap.Changed()
+	local made = { switches = 0, buttons = {} }
+	local A = NS.API
+	local function text()
+		local t = w.widget()
+		t.GetStringHeight = function() return 14 end
+		return t
+	end
+	A.Skin = function() end
+	A.Text = function() return text() end
+	A.Close = function() return w.widget() end
+	A.Colors = function() return { VALUE = { 1, 1, 1 }, TEXT = { 1, 1, 1 } } end
+	A.Button = function(_, label)
+		local b = w.widget()
+		made.buttons[label] = b
+		return b
+	end
+	A.Switch = function()
+		made.switches = made.switches + 1
+		local sw = w.widget()
+		sw.SetOn = function(value) sw.on = value end
+		return sw
+	end
+	rawset(_G, "UIParent", w.widget())
+	T.eq(Overlap.Show(false), true, "there is something to ask: the window shows")
+	T.eq(made.switches, 2, "one switch per surface")
+	T.check(made.buttons[L["Apply"]] and made.buttons[L["Ask Me Later"]], "Apply and Ask Me Later")
+	local frame = rawget(_G, "DaylightGearOverlap") or w.frames_[#w.frames_]
+	T.check(frame ~= nil, "a frame was made")
+	-- Apply with the switches as they stand: both surfaces answered "ours"
+	made.buttons[L["Apply"]]:Click()
+	T.eq(#Overlap.Unasked(), 0, "Apply answers what was shown")
+	T.eq(Overlap.Yields("bags"), false, "ours by default")
+	T.eq(Overlap.Show(false), false, "nothing left to ask: no window")
+	WORLD.combat = true
+	T.eq(Overlap.Show(true), false, "never opened in a fight")
+	WORLD.combat = false
+	A.Skin, A.Text, A.Close, A.Button, A.Switch, A.Colors = nil, nil, nil, nil, nil, nil
+	rawset(_G, "UIParent", {})
 end)
 
 return T.done()
