@@ -357,16 +357,16 @@ function Compare.SetValue(ctx)
 end
 
 -- What a main hand and an off hand that are BOTH new are worth together, with the hit cap
--- counted over the two of them. mainScore and offScore are their scores for those hands
+-- counted over the two of them. mainValue and offValue are their scores for those hands
 -- (Compare.HandScores); nil when the two cannot be held together (one unique-equipped item
 -- twice).
-function Compare.PairScore(ctx, mainRec, mainScore, offRec, offScore)
+function Compare.PairScore(ctx, mainRec, mainValue, offRec, offValue)
 	if mainRec.id == offRec.id and (mainRec.unique or offRec.unique) then return nil end
-	if not ctx.hit then return mainScore + offScore end
+	if not ctx.hit then return mainValue + offValue end
 	local w = ctx.wornRec
 	-- (The main hand goes on first; the off hand's hit counts in what room is left.)
-	local a = capped(ctx, mainRec, mainScore, w[16], w[17])
-	local b = capped(ctx, offRec, offScore, w[16], w[17], mainRec.stats)
+	local a = capped(ctx, mainRec, mainValue, w[16], w[17])
+	local b = capped(ctx, offRec, offValue, w[16], w[17], mainRec.stats)
 	return a + b
 end
 

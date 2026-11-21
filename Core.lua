@@ -145,6 +145,12 @@ local DEFAULTS = {
 	-- :686-696 in Daylight UI 2.1.2);
 	-- bottom right holds only stack counts, which gear never has.
 	dock = true,            -- (second half) the window docks to Daylight UI's Auction House
+	questPick = true,       -- (stage 2) a chat line naming the best reward of a quest with a choice
+	questSell = false,      -- (stage 2) with no upgrade among them, which sells for most. Off: Daylight UI's
+	-- quest window already marks that reward with a coin (DaylightUI\Npc\Window.lua:32, :292)
+	alert = true,           -- (stage 2) one chat line when a scan finds a better buy for a slot
+	yieldBags = false,      -- (stage 2) another addon marks bag upgrades and ours stands down
+	yieldTips = false,      -- (stage 2) the same for the tooltip row
 }
 ns.DEFAULTS = DEFAULTS
 
@@ -165,6 +171,13 @@ function ns.Get(path)
 	end
 	cache[path] = value == nil and NONE or value
 	return value
+end
+
+-- Writes a setting of ours through Daylight UI (its options page and "SettingChanged" follow).
+function ns.SetSetting(path, value)
+	local D = ns.DUI
+	if type(D) ~= "table" or type(D.Set) ~= "function" then return false end
+	return (pcall(D.Set, D, ADDON, path, value))
 end
 
 -- The ranking options as Rank.Arrange takes them.
@@ -508,6 +521,7 @@ ns.dataProblems = Spec.Load(ns.WeightData)
 me.On("Login", function()
 	ns.DB()
 	SpecNames()
+	ns.ReadHitMod()
 	WhoChanged()
 	-- (Worked out now, out of a fight, rather than at the first question.)
 	ns.Who()
@@ -546,6 +560,26 @@ local function Debug()
 		print(("spec %s.%s (%s), level %d; weights: %s, confidence %s%s"):format(w.class, w.spec, tostring(w.how), w.level,
 			tostring(info.source), tostring(info.confidence),
 			info.sourcePath and (", " .. info.sourcePath .. " @ " .. tostring(info.sourceCommit):sub(1, 10)) or ""))
+	end
+	-- The hit cap, as Compare.lua counts it.
+	local ctx = ns.Context()
+	if ctx and ctx.hit then
+		local h = ctx.hit
+		print(("hit: melee and ranged %.2f%% of %d (%.2f%% not from gear), spell %.2f%% of %d (%.2f%% not from gear)%s"):format(
+			h.have.HIT, h.cap.HIT, h.mod.HIT, h.have.SPELL_HIT, h.cap.SPELL_HIT, h.mod.SPELL_HIT,
+			h.dual and "; dual wielding" or ""))
+	elseif ctx then
+		print("hit: this spec's weights do not value hit, so no cap is worked out")
+	end
+	if ns.Overlap then
+		for _, surface in ipairs({ "bags", "tips" }) do
+			local names = {}
+			for _, rival in ipairs(ns.Overlap.Rivals(surface)) do
+				names[#names + 1] = rival.name .. (rival.can and " (switched by us)" or " (no switch)")
+			end
+			print(("other addons on %s: %s; ours %s"):format(surface, #names > 0 and table.concat(names, ", ") or "none",
+				ns.Overlap.Yields(surface) and "stands down" or "shows"))
+		end
 	end
 	if not ns.Game.Trees() then print("talent trees: not readable right now (the spec above was found without them)") end
 	print(("character: %s, realm name %s, realm number %s, faction %s; saved under its GUID: %s"):format(
@@ -656,6 +690,15 @@ local pages = {
 			  disabled = Off },
 			{ type = "toggle", key = "dock", label = L["Dock to the Auction House"],
 			  desc = L["The Upgrades for Sale window sits against Daylight UI's Auction House window while that is open."], disabled = Off },
+			{ type = "toggle", key = "alert", label = L["Chat Alert"],
+			  desc = L["One chat line when the Auction House has a better buy for a slot than last time."], disabled = Off },
+		} },
+		{ label = L["Quest Rewards"], items = {
+			{ type = "toggle", key = "questPick", label = L["Best Reward in Chat"],
+			  desc = L["When a quest lets you choose a reward, a chat line names the biggest upgrade."], disabled = Off },
+			{ type = "toggle", key = "questSell", label = L["Vendor Value Hint"],
+			  desc = L["With no upgrade among the rewards, names the one that sells for the most."],
+			  disabled = function(get) return get("enabled") == false or get("questPick") == false end },
 		} },
 		{ label = L["Shows On"], items = {
 			{ type = "toggle", key = "tooltips", label = L["Item Tooltips"],
@@ -668,6 +711,17 @@ local pages = {
 			  order = { "top_left", "top_right", "bottom_left", "bottom_right" },
 			  desc = L["Which corner of the slot the mark sits in."],
 			  disabled = function(get) return get("enabled") == false or get("bagMarks") == false or NoBags() end },
+		} },
+		{ label = L["Other Addons"], items = {
+			{ type = "toggle", key = "yieldBags", label = L["Leave Bag Marks to Them"],
+			  desc = L["Another addon marks upgrades in your bags, and Gear Advice shows no mark of its own."],
+			  disabled = function(get) return get("enabled") == false or not ns.Overlap or #ns.Overlap.Rivals("bags") == 0 end },
+			{ type = "toggle", key = "yieldTips", label = L["Leave Tooltips to Them"],
+			  desc = L["Another addon adds upgrade lines to tooltips, and Gear Advice adds no row of its own."],
+			  disabled = function(get) return get("enabled") == false or not ns.Overlap or #ns.Overlap.Rivals("tips") == 0 end },
+			{ type = "button", label = L["Ask Again"], text = L["Show"],
+			  desc = L["Opens the question about addons that do the same as Gear Advice."],
+			  func = function() if ns.Overlap then ns.Overlap.Show(true) end end },
 		} },
 		{ label = L["About the Numbers"], items = {
 			{ type = "text", label = L["Stat weights are starting values, not final answers. Level 60 weights for many specs are based on the WoWSims simulator (wowsims.com); the rest, and all weights below level 60, are our own."] },

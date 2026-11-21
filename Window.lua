@@ -393,12 +393,18 @@ Step = function()
 		-- The best per slot was kept as the rows came, so the end needs no sort of everything
 		-- found (thousands of rows for a well-geared house): the live view IS the arrangement,
 		-- unless a price dropped on a row already placed (then it is arranged once, in full).
-		if job.live.stale then return Window.Rearrange() end
-		job.live.changed = false
-		S.view = job.live:View(job.rows)
-		Remodel()
-		S.painted = t0
-		return Paint()
+		if job.live.stale then
+			Window.Rearrange()
+		else
+			job.live.changed = false
+			S.view = job.live:View(job.rows)
+			Remodel()
+			S.painted = t0
+			Paint()
+		end
+		-- (The list is whole: is there a better buy than the last time? Alert.lua.)
+		if ns.Alert and ns.Market.Saved() then ns.Alert.Check(S.view) end
+		return
 	end
 	-- The list fills in: only when what would be shown changed, not more than once a second,
 	-- and on a tick of its own (a paint and a slice of scoring in one frame would be two
@@ -557,6 +563,7 @@ local function Repriced()
 		S.pricedAt = S.painted
 		ns.Perf.Count("reprice")
 		Paint()
+		if ns.Alert then ns.Alert.Check(S.view) end
 	end)
 end
 
@@ -665,7 +672,9 @@ local function SearchInDui(name)
 	return (pcall(page.Submit, name, true))
 end
 
-local function Money(copper)
+local Money
+ns.Money = function(copper) return Money(copper) end
+Money = function(copper)
 	local D = ns.DUI
 	if type(D) == "table" and type(D.MoneyString) == "function" then
 		local ok, text = pcall(D.MoneyString, copper)

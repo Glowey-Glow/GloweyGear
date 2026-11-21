@@ -30,6 +30,7 @@ local NEWS = {
 		TOOLTIP,
 		BAGS,
 		L["Stat weights for every class and talent tree, with their own values while you level."],
+		L["Quest rewards: a chat line names the best reward for you."],
 	} },
 }
 
@@ -97,6 +98,8 @@ Guide.AddTour("gear", {
 	  text = function()
 		return string.format(L["A green plus in a corner of a bag or bank slot marks an upgrade you already have. %s in the options moves it to another corner."], Pop(L["Bag Corner"]))
 	  end },
+	{ title = L["Quest Rewards"],
+	  text = L["When a quest lets you choose a reward, a chat line names the biggest upgrade for you, and that reward's tooltip says so too."] },
 	{ title = L["About the Numbers"],
 	  text = function()
 		return string.format(L["Stat weights are a starting point, not a final answer: they can be wrong for your build. Your spec and the other settings are in Daylight UI's options: %s. %s there shows this tour again."],

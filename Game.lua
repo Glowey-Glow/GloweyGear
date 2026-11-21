@@ -306,6 +306,31 @@ function Game.HitModifiers()
 	return melee, type(ranged) == "number" and ranged or melee, spell
 end
 
+-- The rewards a quest lets the player choose between, while its reward page is up: fills
+-- out[i] = { link = (nil while the item is not loaded), count = } and returns how many.
+-- GetNumQuestChoices, GetQuestItemLink(type, index), GetQuestItemInfo(type, index) -> name,
+-- texture, count, quality, usable, itemID: the game's own quest frame calls them so (FX
+-- Blizzard_UIPanels_Game\Mainline\QuestInfo.lua:526, :647; QuestFrame.lua:743).
+function Game.QuestChoices(out)
+	local num, link, info = rawget(_G, "GetNumQuestChoices"), rawget(_G, "GetQuestItemLink"), rawget(_G, "GetQuestItemInfo")
+	if type(num) ~= "function" or type(link) ~= "function" then return 0 end
+	local ok, n = pcall(num)
+	n = ok and Plain(n) or 0
+	if type(n) ~= "number" then return 0 end
+	for i = 1, n do
+		local okL, l = pcall(link, "choice", i)
+		l = okL and Plain(l) or nil
+		local count = 1
+		if type(info) == "function" then
+			local okI, _, _, c = pcall(info, "choice", i)
+			c = okI and Plain(c) or nil
+			if type(c) == "number" and c > 0 then count = c end
+		end
+		out[i] = { link = type(l) == "string" and l ~= "" and l or nil, count = count }
+	end
+	return n
+end
+
 function Game.InCombat()
 	return InCombatLockdown and InCombatLockdown() and true or false
 end

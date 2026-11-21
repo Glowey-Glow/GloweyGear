@@ -353,25 +353,6 @@ end
 -- says when it is there. Dropped with the list it was made for.
 local listIndex, listIndexing
 
-function Market.IndexFrom(e, order)
-	local idx = { of = e.items, pos = {}, byItem = {}, extra = {} }
-	for i = 1, #order do
-		local key = order[i]
-		idx.pos[key] = i
-		local id = tonumber(key:match("^(%d+)"))
-		if id then
-			local keys = idx.byItem[id]
-			if not keys then
-				keys = {}
-				idx.byItem[id] = keys
-			end
-			keys[#keys + 1] = key
-		end
-	end
-	listIndex, listIndexing = idx, nil
-	return idx
-end
-
 local function indexSome()
 	local e = Market.Saved()
 	local w = listIndexing
@@ -380,29 +361,42 @@ local function indexSome()
 		return
 	end
 	local t0 = Game.Clock()
-	local items = e.items
+	local items, idx = e.items, w.idx
+	local pos, byItem = idx.pos, idx.byItem
 	local i = w.at
 	while i <= #items do
-		local key = tostring(items[i]):match("^([^#]+)#")
-		if key then w.order[i] = key else w.order[i] = "?" .. i end
+		local key, id = tostring(items[i]):match("^((%d+)[^#]*)#")
+		if key then
+			pos[key] = i
+			id = tonumber(id)
+			local keys = byItem[id]
+			if not keys then
+				keys = {}
+				byItem[id] = keys
+			end
+			keys[#keys + 1] = key
+		end
 		i = i + 1
-		if i % 50 == 0 and Game.Clock() - t0 >= TUNE.INDEX_MS then break end
+		if i % 25 == 0 and Game.Clock() - t0 >= TUNE.INDEX_MS then break end
 	end
 	w.at = i
-	ns.Perf.Time("market", Game.Clock() - t0)
-	if i <= #items then return C_Timer.After(0, indexSome) end
-	local idx = Market.IndexFrom(e, w.order)
+	if i <= #items then
+		ns.Perf.Time("market", Game.Clock() - t0)
+		return C_Timer.After(0, indexSome)
+	end
 	-- (Keys that only a correction knows are part of the picture too.)
 	for key, at in pairs(type(e.fixT) == "table" and e.fixT or {}) do
-		if at > ReadAt(e) and not idx.pos[key] then
+		if at > ReadAt(e) and not pos[key] then
 			idx.extra[key] = true
 			local id = tonumber(key:match("^(%d+)"))
 			if id then
-				idx.byItem[id] = idx.byItem[id] or {}
-				idx.byItem[id][#idx.byItem[id] + 1] = key
+				byItem[id] = byItem[id] or {}
+				byItem[id][#byItem[id] + 1] = key
 			end
 		end
 	end
+	listIndex, listIndexing = idx, nil
+	ns.Perf.Time("market", Game.Clock() - t0)
 	ns.Fire("MarketIndexed")
 end
 
@@ -413,7 +407,7 @@ function Market.Index()
 	if listIndex and listIndex.of == e.items then return listIndex end
 	listIndex = nil
 	if not listIndexing or listIndexing.of ~= e.items then
-		listIndexing = { of = e.items, at = 1, order = {} }
+		listIndexing = { of = e.items, at = 1, idx = { of = e.items, pos = {}, byItem = {}, extra = {} } }
 		C_Timer.After(0, indexSome)
 	end
 	return nil
@@ -812,7 +806,8 @@ local function save(j, t0)
 		if at <= e.readAt then e.fixT[key], e.fixP[key] = nil, nil end
 	end
 	decoded, decodedFrom = nil, nil
-	Market.IndexFrom(e, j.order)
+	-- (The index of the new list is made when first asked for, in slices: making it here, in
+	-- the frame that puts the list in place, was a frame of 7.9 ms for 15,620 items.)
 	lastPrint = { total = j.total, probes = j.probes }
 	stop(j, j.afterClose and "saved (finished after the Auction House closed)" or "saved")
 	ns.Fire("MarketChanged")
@@ -1004,6 +999,13 @@ local function tailStep()
 	t.scheduled = false
 	if job then return tailStop("a new read began") end
 	if not open then return tailStop("the Auction House closed") end
+	-- (The window is scoring the new list: its 3 ms and the tail's 1.5 ms are not spent in one
+	-- frame. The tail waits its turn.)
+	local W = ns.Window
+	if W and W.S and W.S.running and W.IsShown() then
+		t.scheduled = true
+		return C_Timer.After(0.25, tailStep)
+	end
 	if t.pass > 0 and t.at == 1 and Now() - t.began >= TUNE.TAIL_MAX_S then return tailStop("its ten minutes were up") end
 	local e = Market.Saved()
 	if not e or e.items ~= t.items then return tailStop("the list was replaced") end

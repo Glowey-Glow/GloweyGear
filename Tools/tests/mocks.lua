@@ -141,6 +141,12 @@ function Game.BagLinks(out)
 	return out
 end
 function Game.InCombat() return WORLD.combat == true end
+-- WORLD.quest = { { link = , count = }, ... }: the rewards to choose between.
+function Game.QuestChoices(out)
+	called("QuestChoices")
+	for i, it in ipairs(WORLD.quest or {}) do out[i] = { link = it.link, count = it.count or 1 } end
+	return #(WORLD.quest or {})
+end
 -- WORLD.hitMod = { melee, ranged, spell } (percent); nil = the game does not say (a fight).
 function Game.HitModifiers()
 	called("HitModifiers")
@@ -242,7 +248,7 @@ end
 -- Starts a case from nothing: no items cached, nothing worn or carried.
 function T.reset()
 	WORLD.items, WORLD.worn, WORLD.bags, WORLD.speed, WORLD.effects = {}, {}, {}, {}, {}
-	WORLD.combat, WORLD.clock, WORLD.hitMod = false, 0, nil
+	WORLD.combat, WORLD.clock, WORLD.hitMod, WORLD.quest = false, 0, nil, nil
 	WORLD.guid, WORLD.name, WORLD.realm, WORLD.realmID, WORLD.faction = "Player-4407-00ABCDEF", "Tester", "Test Realm", nil, "Alliance"
 	WORLD.class, WORLD.level, WORLD.trees, WORLD.skills, WORLD.spells = "WARRIOR", 60, nil, nil, {}
 	WORLD.calls, WORLD.requested, WORLD.noCacheCall = {}, {}, nil

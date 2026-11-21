@@ -311,6 +311,8 @@ local function UpdaterFor(corner)
 	return function(frame, details)
 		if corner ~= Corner() then return false end
 		if ns.Get("enabled") == false or ns.Get("bagMarks") == false then return false end
+		-- (Another addon marks bag upgrades and the player chose it: Overlap.lua.)
+		if ns.Overlap and ns.Overlap.Yields("bags") then return false end
 		local link = type(details) == "table" and details.itemLink or nil
 		if type(link) ~= "string" then return false end
 		-- (The backpack and the four bags are "carried", as Game.BagLinks reads them: Game.lua.)
@@ -405,7 +407,8 @@ local function WhoChanged()
 	Marks.Refresh()
 end
 
-local MINE = { enabled = true, minGain = true, bestArmor = true, tooltips = true, bagMarks = true, bagCorner = true }
+local MINE = { enabled = true, minGain = true, bestArmor = true, tooltips = true, bagMarks = true, bagCorner = true,
+	yieldBags = true, yieldTips = true }
 local function Setting(path)
 	if path ~= nil and not MINE[path] then return end
 	lastSig = nil
@@ -429,6 +432,7 @@ end
 -- the tooltip is not added twice (:1225-1230). Line numbers are Daylight UI 2.1.2's.
 local function OnItemTooltip(lines, data)
 	if ns.Get("enabled") == false or ns.Get("tooltips") == false then return end
+	if ns.Overlap and ns.Overlap.Yields("tips") then return end
 	local link = type(data) == "table" and data.link or nil
 	if type(link) ~= "string" or type(lines) ~= "table" then return end
 	local entry = Lookup("tip", link)
@@ -437,6 +441,12 @@ local function OnItemTooltip(lines, data)
 	if type(row) == "function" then row(L["Gear Advice"], entry.text, entry.color) end
 	-- (lines.Text: a wrapped sentence in both looks, API.md's tooltip pieces table.)
 	if entry.note and type(lines.Text) == "function" then lines.Text(Marks.NOTE, COLOR.soft) end
+	-- (The reward Quest.lua picked, while its quest page is open.)
+	local Q = ns.Quest
+	if Q and type(lines.Text) == "function" then
+		local best = Q.Best()
+		if best and best == ns.Stats.Key(link) then lines.Text(L["Best reward of this quest for you."], COLOR.good) end
+	end
 end
 Marks.OnItemTooltip = OnItemTooltip
 
