@@ -15,7 +15,7 @@ Writes Tools/tests/fixtures/client_stat_keys.txt and client_combat_ratings.txt:
     family): for each column, the set of values over all level rows. On this client every column
     holds one value at every level.
 
-It needs the owner's game-file reader (E:\\daylight\\GloweyHUD\\tools\\mockup\\casc.py), which
+It needs the owner's game-file reader (Tools\\casc.py, next to this file), which
 opens the game's local data read-only. Nothing is sent anywhere. Not part of the zip players
 download.
 """
@@ -25,8 +25,8 @@ import struct
 import sys
 import zlib
 
-READER = r"E:\daylight\GloweyHUD\tools\mockup"
 HERE = os.path.dirname(os.path.abspath(__file__))
+READER = HERE
 OUT = os.path.join(HERE, "tests", "fixtures")
 GLOBAL_STRINGS, COMBAT_RATINGS = 1394440, 1391669
 
