@@ -6,6 +6,12 @@ A plugin for Daylight UI, by Glowey (not part of Daylight UI itself: report its 
 
 ---
 
+## New in 1.0.3
+- **Profession gear:** gear that asks for a profession (engineering goggles, fishing hats and poles, the blacksmith's and alchemist's trinkets) is checked against your professions and your skill in them. One you can't equip is left out of the Auction House upgrades and gets no upgrade mark in your bags.
+- **Its tooltip says why:** "Needs Engineering (150)".
+
+---
+
 ## What's in it
 
 ### Upgrades for Sale
