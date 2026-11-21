@@ -504,11 +504,15 @@ end
 -- A price changed for one item (a search said so, or a row of the scan was read late). The
 -- score does not depend on the price, so nothing is scored again: the job moves the row within
 -- its slot, and the window paints once, on the next frame, however many prices came.
+-- Corrections can come in a stream (Check Prices, the tail): the list is painted for them
+-- once a second at most, like scoring progress (27 paints in a minute were seen in play, one
+-- of 4.5 ms). The first of a quiet spell paints on the next frame.
 local pricedSoon = false
 local function Repriced()
 	if pricedSoon or not Shown() then return end
 	pricedSoon = true
-	C_Timer.After(0, function()
+	local since = (Game.Clock() - (S.pricedAt or -REPAINT_MS)) / 1000
+	C_Timer.After(since >= REPAINT_MS / 1000 and 0 or (REPAINT_MS / 1000 - since), function()
 		pricedSoon = false
 		local job = S.job
 		if not job or not Shown() then return end
@@ -521,6 +525,7 @@ local function Repriced()
 		S.view = job.live:View(job.rows)
 		S.model = Window.Model(S.view, S.selected)
 		S.painted = Game.Clock()
+		S.pricedAt = S.painted
 		ns.Perf.Count("reprice")
 		Paint()
 	end)
@@ -862,6 +867,9 @@ local function Facts()
 		scoring = S.running, left = S.job and (S.job:Left() + S.job.nParked) or 0,
 		unread = (S.job and not S.running and S.job.gaveUp or 0) + (ns.Market.Saved() and ns.Market.Saved().lost or 0),
 		gone = S.job and S.job.gone or 0,
+		-- (Listings never read, of items that do have another listing in the list; not while
+		-- the tail is still reading them.)
+		unreadRows = (ns.Market.Saved() and not ns.Market.Tail()) and ns.Market.Saved().lostRows or 0,
 		listed = S.view and S.view.listed or 0, over = Window.Over(S.view), money = Money,
 	}
 end
@@ -893,6 +901,10 @@ local function SubText(facts)
 	if ns.Check then checking, done, total = ns.Check.State() end
 	if checking then parts[#parts + 1] = L["Checking prices: %d of %d."]:format(math.min(done + 1, total), total) end
 	-- (Said plainly: gear that was for sale and could not be read is not in the list.)
+	if (facts.unread or 0) == 0 and (facts.unreadRows or 0) > 0 then
+		parts[#parts + 1] = ns.Plural(facts.unreadRows, L["%d listing could not be read."], L["%d listings could not be read."],
+			L["%d listings could not be read.#few"])
+	end
 	if (facts.unread or 0) > 0 then
 		parts[#parts + 1] = ns.Plural(facts.unread, L["%d item for sale could not be read."], L["%d items for sale could not be read."],
 			L["%d items for sale could not be read.#few"])

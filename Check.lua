@@ -74,13 +74,24 @@ ns.Check = Check
 local Game, Stats = ns.Game, ns.Stats
 local secret = issecretvalue
 
-local READ_A_FRAME = 120   -- results read in one frame
+local READ_MS = 2           -- time in one frame for reading results
 local READ_MOST = 600      -- results read of one search at most (beyond that it is not "complete")
 local GAP = 0.2            -- seconds between two searches of a run
 local ANSWER = 20          -- seconds a search of a run may take before the run goes on without it
 
 local counts = { results = 0, applied = 0, gone = 0, unmappable = 0, sent = 0, answered = 0, failed = 0, purchases = 0 }
 Check.counts = counts
+-- Why a search of Check Prices failed, counted by cause: Daylight UI's own reason for a search
+-- that ended without rows ("timeout", "uncached": no key info came, "error", "closed",
+-- "ruleset", "noruleset": its Search.lua:9-15), "refused" (its Search.Item raised an
+-- error), "no answer" (its callback never came within ANSWER seconds).
+local failedWhy = {}
+Check.failedWhy = failedWhy
+local function failed(why)
+	why = type(why) == "string" and why or "unknown"
+	counts.failed = counts.failed + 1
+	failedWhy[why] = (failedWhy[why] or 0) + 1
+end
 
 local function plain(v)
 	if v == nil or (secret and secret(v)) then return nil end
@@ -190,8 +201,6 @@ end
 -- Reading a result set from the game
 -- ---------------------------------------------------------------------------------------------
 local sell = {}        -- itemID -> true while a search of ours (Daylight UI's sell search) is out
-local wanted = {}      -- itemID -> the searched item key, to be read
-local reading = false
 
 local function AH()
 	local a = rawget(_G, "C_AuctionHouse")
@@ -202,19 +211,41 @@ local function AH()
 	return a
 end
 
--- One item's results, READ_A_FRAME a frame; then Check.Apply.
-local function readItem(itemID, key, state)
-	local a = AH()
-	if not a then return true end
-	-- (Whether the search was one of ours is noted now: the mark is taken off when its answer comes.)
-	state = state or { i = 0, list = {}, anyRolled = false, missing = false, unmappable = false, sell = sell[itemID] == true }
-	local okN, n = pcall(a.GetNumItemSearchResults, key)
-	n = okN and plain(n) or 0
-	if type(n) ~= "number" then n = 0 end
-	local cut = n > READ_MOST
-	if cut then n = READ_MOST end
-	local stopAt = math.min(n, state.i + READ_A_FRAME)
-	for i = state.i + 1, stopAt do
+-- Result sets are read by one worker, READ_MS a frame at most (the clock looked at every 10
+-- results), one item after another; an item whose results changed while it waited or was
+-- being read is simply read afresh. (Reading every waiting item in one go, and arranging a
+-- slot again for each corrected key, made a frame of 4.3 ms in play.)
+local queue, queued, working = {}, {}, false
+
+local function finishItem(a, state)
+	local itemID, key = state.itemID, state.key
+	if state.unmappable then
+		counts.unmappable = counts.unmappable + 1
+		return
+	end
+	local okF, full = pcall(a.HasFullItemSearchResults, key)
+	local cover = {}
+	cover.full = okF and plain(full) == true and not state.cut and not state.missing
+	-- (A key searched with a level or a suffix covers only that level or suffix.)
+	local suffix, level = plain(key.itemSuffix), plain(key.itemLevel)
+	cover.plain = cover.full and (suffix == nil or suffix == 0) and (level == nil or level == 0)
+	cover.rolled = cover.plain and (state.sell or state.anyRolled)
+	Check.Apply(itemID, state.list, cover, Now())
+end
+
+-- Reads on from where the state stands until `t0 + READ_MS`; true when the item is through.
+local function readSome(a, state, t0)
+	local itemID, key = state.itemID, state.key
+	if not state.n then
+		local okN, n = pcall(a.GetNumItemSearchResults, key)
+		n = okN and plain(n) or 0
+		if type(n) ~= "number" then n = 0 end
+		state.cut = n > READ_MOST
+		state.n = state.cut and READ_MOST or n
+	end
+	local i = state.i
+	while i < state.n do
+		i = i + 1
 		local ok, r = pcall(a.GetItemSearchResultInfo, key, i)
 		if ok and type(r) == "table" then
 			counts.results = counts.results + 1
@@ -235,38 +266,49 @@ local function readItem(itemID, key, state)
 		else
 			state.missing = true
 		end
+		if i % 10 == 0 and Game.Clock() - t0 >= READ_MS then break end
 	end
-	state.i = stopAt
-	if stopAt < n then
-		C_Timer.After(0, function() readItem(itemID, key, state) end)
-		return false
-	end
-	if state.unmappable then
-		counts.unmappable = counts.unmappable + 1
-		return true
-	end
-	local okF, full = pcall(a.HasFullItemSearchResults, key)
-	local cover = {}
-	cover.full = okF and plain(full) == true and not cut and not state.missing
-	-- (A key searched with a level or a suffix covers only that level or suffix.)
-	local suffix, level = plain(key.itemSuffix), plain(key.itemLevel)
-	cover.plain = cover.full and (suffix == nil or suffix == 0) and (level == nil or level == 0)
-	cover.rolled = cover.plain and (state.sell or state.anyRolled)
-	Check.Apply(itemID, state.list, cover, Now())
-	return true
+	state.i = i
+	return i >= state.n
 end
 
-local function readWanted()
-	reading = false
-	if not ns.Market.IsOpen() then
-		wanted = {}
+local function work()
+	working = false
+	local a = AH()
+	if not a or not ns.Market.IsOpen() then
+		queue, queued = {}, {}
 		return
 	end
 	local t0 = Game.Clock()
-	local todo = wanted
-	wanted = {}
-	for itemID, key in pairs(todo) do readItem(itemID, key) end
+	while queue[1] do
+		local state = queue[1]
+		if queued[state.itemID] ~= state then
+			table.remove(queue, 1)   -- (asked for afresh since: the newer state is further back)
+		elseif readSome(a, state, t0) then
+			table.remove(queue, 1)
+			queued[state.itemID] = nil
+			finishItem(a, state)
+		end
+		if Game.Clock() - t0 >= READ_MS then break end
+	end
 	ns.Perf.Time("check", Game.Clock() - t0)
+	if queue[1] then
+		working = true
+		C_Timer.After(0, work)
+	end
+end
+
+-- Puts an item's result set in line to be read (again, from its start, when it already was).
+-- Whether the search was one of ours is noted now: the mark is taken off when its answer comes.
+local function readItem(itemID, key)
+	local state = { itemID = itemID, key = key, i = 0, list = {}, anyRolled = false, missing = false, unmappable = false,
+		sell = sell[itemID] == true }
+	queued[itemID] = state
+	queue[#queue + 1] = state
+	if not working then
+		working = true
+		C_Timer.After(0, work)
+	end
 end
 
 -- A result set for an item key arrived (or grew).
@@ -278,13 +320,11 @@ local function onResults(itemKey)
 	-- (Only gear is ours: an instant call on the item ID.)
 	local equipLoc = Game.ItemInstant(itemID)
 	if not (equipLoc and Stats.GEAR[equipLoc]) then return end
-	wanted[itemID] = { itemID = itemID, itemLevel = plain(itemKey.itemLevel) or 0, itemSuffix = plain(itemKey.itemSuffix) or 0,
+	local key = { itemID = itemID, itemLevel = plain(itemKey.itemLevel) or 0, itemSuffix = plain(itemKey.itemSuffix) or 0,
 		battlePetSpeciesID = plain(itemKey.battlePetSpeciesID) or 0 }
 	Check.lastKey = Check.lastKey or {}
-	Check.lastKey[itemID] = wanted[itemID]
-	if reading then return end
-	reading = true
-	C_Timer.After(0, readWanted)
+	Check.lastKey[itemID] = key
+	readItem(itemID, key)
 end
 Check.OnResults = onResults
 
@@ -352,14 +392,14 @@ Next = function()
 	local token = run.token
 	sell[itemID] = true
 	counts.sent = counts.sent + 1
-	local ok, started = pcall(m.Search.Item, itemID, function(rows)
+	local ok, started = pcall(m.Search.Item, itemID, function(rows, reason)
 		if rows then
 			counts.answered = counts.answered + 1
 			-- (Read once more now that Daylight UI has every page: this is the complete set.)
 			local key = Check.lastKey and Check.lastKey[itemID]
 			if key and ns.Market.IsOpen() then readItem(itemID, key) end
 		else
-			counts.failed = counts.failed + 1
+			failed(reason)
 		end
 		sell[itemID] = nil
 		advance(token, GAP)
@@ -367,13 +407,13 @@ Next = function()
 	if not ok or started == false then
 		-- (It could not start, or ended at once: its callback has run, or never will.)
 		sell[itemID] = nil
-		if not ok then counts.failed = counts.failed + 1 end
+		if not ok then failed("refused") end
 		return advance(token, GAP)
 	end
 	-- (An answer that never comes does not hold the run up for ever.)
 	C_Timer.After(ANSWER, function()
 		if run and run.token == token then
-			counts.failed = counts.failed + 1
+			failed("no answer")
 			sell[itemID] = nil
 			advance(token, 0)
 		end
@@ -428,7 +468,8 @@ frame:SetScript("OnEvent", function(_, event, a)
 		listen(false)
 		Check.Stop()
 		-- (Auction IDs mean nothing once the house is closed.)
-		last, byAuction, wanted, deferred, sell = {}, {}, {}, {}, {}
+		last, byAuction, deferred, sell = {}, {}, {}, {}
+		queue, queued = {}, {}
 		Check.lastKey = nil
 	elseif event == "AUCTION_HOUSE_PURCHASE_COMPLETED" then
 		if type(plain(a)) == "number" then Check.Bought(a) end
@@ -441,10 +482,13 @@ for _, event in ipairs({ "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED" }) do pcal
 function Check.Debug()
 	local fixes, gone = ns.Market.FixCount()
 	local running, done, total = Check.State()
+	local why = {}
+	for reason, n in pairs(failedWhy) do why[#why + 1] = reason .. " " .. n end
+	table.sort(why)
 	return {
 		("prices: %d search results read; %d prices corrected, %d marked as none left (now in force: %d, of them none left: %d); %d purchases of yours seen"):format(
 			counts.results, counts.applied, counts.gone, fixes, gone, counts.purchases),
-		("prices: Check Prices sent %d searches, %d answered, %d failed%s; result sets whose links showed no roll for a suffixed item: %d"):format(
-			counts.sent, counts.answered, counts.failed, running and (" (running: %d of %d)"):format(done, total) or "", counts.unmappable),
+		("prices: Check Prices sent %d searches, %d answered, %d failed%s%s; result sets whose links showed no roll for a suffixed item: %d"):format(
+			counts.sent, counts.answered, counts.failed, #why > 0 and (" (" .. table.concat(why, ", ") .. ")") or "", running and (" (running: %d of %d)"):format(done, total) or "", counts.unmappable),
 	}
 end

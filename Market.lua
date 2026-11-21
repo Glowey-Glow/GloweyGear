@@ -83,6 +83,7 @@ local TUNE = {
 	TAIL_MS = 1.5,        -- the tail's time in one frame (rows still without a link after the list is saved)
 	TAIL_PAUSE = 2,       -- seconds between two passes of the tail
 	TAIL_IDLE = 5,        -- passes in a row with nothing new before the tail gives up
+	TAIL_MAX_S = 600,     -- and it never works longer than this after a list was saved
 	INDEX_MS = 2,         -- time in one frame for indexing a saved list
 	CHECK_MS = 1000,      -- how often, at most, a running read looks whether the list was replaced
 	ITEM_TRIES = 3,       -- times an item is asked for before its rows are given up
@@ -980,7 +981,20 @@ local tail
 
 local function tailStop(why)
 	if not tail then return end
-	dbg.tail = { got = tail.got, items = tail.gotItems, left = tail.n - tail.done, passes = tail.pass, why = why }
+	-- (What is left, said honestly: how many items those rows are, and how many of those have
+	-- no listing in the saved list at all.)
+	local items, unlisted = 0, 0
+	local seen = {}
+	for i = 1, tail.n do
+		local id = tail.rows[i] and tail.ids[i]
+		if id and not seen[id] then
+			seen[id] = true
+			items = items + 1
+			if tail.counted[id] and not tail.seen[id] then unlisted = unlisted + 1 end
+		end
+	end
+	dbg.tail = { got = tail.got, items = tail.gotItems, left = tail.n - tail.done, passes = tail.pass, why = why,
+		leftItems = items, unlisted = unlisted }
 	tail = nil
 end
 
@@ -990,6 +1004,7 @@ local function tailStep()
 	t.scheduled = false
 	if job then return tailStop("a new read began") end
 	if not open then return tailStop("the Auction House closed") end
+	if t.pass > 0 and t.at == 1 and Now() - t.began >= TUNE.TAIL_MAX_S then return tailStop("its ten minutes were up") end
 	local e = Market.Saved()
 	if not e or e.items ~= t.items then return tailStop("the list was replaced") end
 	local t0 = Game.Clock()
@@ -1065,7 +1080,7 @@ function Market.StartTail(j)
 	if not e then return end
 	tail = { rows = j.tailRows, ids = j.tailIDs, n = #j.tailRows, at = 1, done = 0, got = 0, gotItems = 0, gotPass = 0,
 		pass = 0, idle = 0, seen = {}, askedPass = {}, counted = j.counted or {}, items = e.items, print = { total = j.total, probes = j.probes },
-		scheduled = true }
+		scheduled = true, began = Now() }
 	dbg.tail = nil
 	C_Timer.After(TUNE.TAIL_PAUSE, tailStep)
 end
@@ -1312,6 +1327,8 @@ function Market.Debug()
 	elseif dbg.tail then
 		add("the tail read %d more rows (%d items) in %d passes, %d left; it stopped because: %s", dbg.tail.got, dbg.tail.items,
 			dbg.tail.passes, dbg.tail.left, dbg.tail.why)
+		add("the rows left are listings of %d items the game never gave a link for; %d of those items have no listing in the saved list",
+			dbg.tail.leftItems or 0, dbg.tail.unlisted or 0)
 	end
 	local fixes, gone = Market.FixCount()
 	add("prices corrected by searches since the list was read: %d (%d of them: none left)", fixes, gone)

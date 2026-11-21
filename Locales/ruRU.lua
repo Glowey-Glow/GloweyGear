@@ -138,3 +138,6 @@ L["Price checked just now."] = "Цена проверена только что.
 L["Searches the Auction House for each item shown, to see what it costs now and whether it is still for sale."] = "Ищет на аукционе каждый показанный предмет, чтобы узнать, сколько он стоит сейчас и продаётся ли ещё."
 L["Stop"] = "Стоп"
 L["%d are no longer for sale.#few"] = "%d больше не продаются."
+L["%d listing could not be read."] = "%d лот не удалось прочитать."
+L["%d listings could not be read."] = "%d лотов не удалось прочитать."
+L["%d listings could not be read.#few"] = "%d лота не удалось прочитать."

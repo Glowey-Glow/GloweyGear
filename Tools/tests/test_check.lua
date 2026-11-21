@@ -283,12 +283,24 @@ T.case("the window moves the row, drops what is gone and scores nothing again", 
 	T.eq(shownNames(), "A=18000,B=21000,Legs=20000", "A leads at its new price")
 	T.check(Window.S.job == job, "the same job"); T.eq(job.seen, seen, "nothing scored again"); T.eq(WORLD.calls.ItemStats, stats, "no item read")
 	T.eq(NS.Perf.Sum("job"), jobs, "no new job"); T.eq(NS.Perf.Sum("reprice"), paints + 1, "two prices, one repaint")
+	-- a stream of corrections paints once a second at most
+	local before = NS.Perf.Sum("reprice")
+	for i = 1, 20 do
+		NS.Fire("PriceChanged", key(b), 21000 + i, GetServerTime())
+		w.frames(2)
+	end
+	T.eq(NS.Perf.Sum("reprice"), before, "twenty corrections inside a second: not one more paint yet")
+	w.advance(1.1)
+	T.eq(NS.Perf.Sum("reprice"), before + 1, "then one, with the last price")
+	NS.Fire("PriceChanged", key(b), 21000, GetServerTime())
+	w.advance(1.1)
 	T.check(Window.CheckedText(job.byKey[key(a)].checkedAt) == NS.L["Price checked just now."], "the row says its price was checked")
 	T.eq(Window.CheckedText(job.byKey[key(legs)].checkedAt), nil, "a row not checked says nothing")
 	-- sold
 	results(a, {}, true)
 	w.advance(61)
 	searched(a)
+	w.advance(1.1)
 	T.eq(shownNames(), "B=21000,Legs=20000", "A dropped out"); T.eq(Window.Facts().gone, 1, "and is counted")
 	T.check(Window.SubText(Window.Facts()):find(NS.L["%d is no longer for sale."]:format(1), 1, true), "the line under the title says so: " .. Window.SubText(Window.Facts()))
 	T.eq(job.seen, seen, "still nothing scored again")
@@ -363,7 +375,7 @@ T.case("Check Prices: one search at a time through Daylight UI, never during a p
 	end
 	T.eq(fixed(c), nil, "the search that failed marked nothing gone")
 	local debug = table.concat(Check.Debug(), "\n")
-	T.check(debug:find("sent 3 searches, 2 answered, 1 failed", 1, true), "/gear debug counts them: " .. debug)
+	T.check(debug:find("sent 3 searches, 2 answered, 1 failed (timeout 1)", 1, true), "/gear debug counts them: " .. debug)
 end)
 
 T.case("Check Prices stops on Stop and when the Auction House closes", function()

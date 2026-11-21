@@ -218,13 +218,33 @@ function Live:Regroup(group, rows)
 	self.changed = true
 end
 
+-- The same, put off until the view is next asked for: a search result can correct twenty
+-- rolls of one item at once, and twenty passes over every row in one frame cost 4 ms in
+-- play. Touch only notes the slot; View makes every noted slot again in ONE pass.
+function Live:Touch(group)
+	self.dirty = self.dirty or {}
+	self.dirty[group] = true
+	self.changed = true
+end
+
 -- The view, in Rank.Arrange's shape. `rows` (every row so far) is only used when the live view
 -- went stale.
 function Live:View(rows)
 	if self.stale and rows then
-		self.stale = false
-		return Rank.Arrange(rows, { mode = self.mode, maxPrice = self.maxPrice, minPct = self.minPct,
+		self.stale, self.dirty = false, nil
+		local view = Rank.Arrange(rows, { mode = self.mode, maxPrice = self.maxPrice, minPct = self.minPct,
 			level = self.level, alternatives = self.keep - 1 })
+		-- (Kept, so the next View is this arrangement and not the one from before.)
+		self.groups, self.over = view.groups, view.over
+		return view
+	end
+	local dirty = self.dirty
+	if dirty and rows then
+		self.dirty = nil
+		for group in pairs(dirty) do self.groups[group], self.over[group] = nil, nil end
+		for i = 1, #rows do
+			if dirty[rows[i].group] then self:Offer(rows[i]) end
+		end
 	end
 	local listed = 0
 	for _, list in pairs(self.groups) do listed = listed + #list end
@@ -381,7 +401,7 @@ function Job:Reprice(key, copper, at)
 		end
 		row.checkedAt = at
 		self.cheapest[key] = copper > 0 and copper or self.cheapest[key]
-		self.live:Regroup(row.group, self.rows)
+		self.live:Touch(row.group)
 		return "row"
 	end
 	if self.cheapest[key] then

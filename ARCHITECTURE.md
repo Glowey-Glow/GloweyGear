@@ -221,6 +221,14 @@ The one frame of up to 7 ms in the first row comes and goes between runs of the 
 
 **The tail (`Market.StartTail`).** Gear rows that gave no link before the read ended are no longer dropped: after the list is saved they are read again by index, 1.5 ms a frame, a pass every 2 s, for as long as the house is open, the game's list is the same and passes still bring something (5 empty passes end it). A row that has its link is merged into the saved list (`Market.Merge`, "MarketAdded"), and the window adds it without a new job. Each lost row is counted by cause (`refused`, `nolink`, `quiet`, `cap`, `closed`, `unasked`) in `/gear debug`.
 
+**Settled in play (owner's `/gear debug`, 2026-11-20, a Full scan of 238,000 rows):**
+- **Talent detection works:** the spec read as "(talents)" with Spec on Auto.
+- **Search-result links carry rolls** as bonus IDs, like scan links: 1,185 results read, 0 result sets unmappable, 112 prices corrected, 2 marked none left.
+- **Why rows gave no link: "nolink".** All 21,031 lost rows were of that cause: the item's data arrived as often as it was asked for (three times) and the row still had no link. Asking for the item by ID does not make the row's link appear; reading the row again later does.
+- **The tail recovers most of them:** 18,295 of 21,031 rows (2,900 items) by pass 45, and the count of gear items with no listing at all went to 0. The 2,736 rows left were further listings of items already in the list. The tail ends after 5 passes that bring nothing, and after 10 minutes at the latest (`TAIL_MAX_S`); its debug line then says how many items the rows left belong to and how many of those have no listing saved. Rows left over are shown in the window as "N listings could not be read." once the tail has stopped.
+- **Frames:** market 1.8 ms, scoring 0.3 ms; paint 4.5 ms and price checks 4.3 ms while corrections streamed in. Since then: corrections repaint once a second at most; result sets are read by one worker at 2 ms a frame; a corrected key only marks its slot (`Live:Touch`) and the slot is made again once, when the view is next asked for.
+- **Check Prices:** 12 sent, 12 answered, 1 counted as failed with no cause kept. Failures are now counted by cause (`timeout`, `uncached`, `error`, `closed`, `ruleset`, `refused`, `no answer`).
+
 ## 7. The three surfaces, as built
 
 ### 7.1 `Market.lua`

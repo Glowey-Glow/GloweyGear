@@ -660,6 +660,25 @@ T.case("rows given up are asked for again after the list is saved, and join it",
 	T.eq(ah.calls.info, calls, "and reads nothing after"); T.check(calls - reads <= 20, "a pass is one read per row still out (" .. (calls - reads) .. ")")
 	T.check(debugText():find("the tail read 4 more rows (3 items)", 1, true) and debugText():find("nothing more arrived", 1, true),
 		"/gear debug says what it did and why it stopped: " .. debugText())
+	T.check(debugText():find("listings of 1 items the game never gave a link for; 1 of those items have no listing", 1, true),
+		"and what is left, honestly: " .. debugText())
+	-- it never works longer than ten minutes, even when every pass brings a row
+	fresh()
+	row(gear(), 10)
+	local slow = {}
+	for i = 1, 400 do slow[i] = row(gear(), 20, { late = true }) end
+	open(); listArrives(); w.frames(3)
+	T.check(settle(40), "saved")
+	local nextRow = 1
+	for _ = 1, 330 do
+		slow[nextRow].late = nil
+		nextRow = nextRow + 1
+		w.advance(2.1)
+		if not Market.Tail() then break end
+	end
+	T.eq(Market.Tail(), false, "a tail that keeps finding one row a pass still ends")
+	T.check(debugText():find("its ten minutes were up", 1, true), "and says why: " .. debugText())
+	close(); w.advance(1)
 	-- stops when the Auction House closes
 	fresh()
 	row(gear(), 10); local late = row(gear(), 20, { late = true })
