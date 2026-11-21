@@ -29,6 +29,7 @@ Update.lua
 Guide.lua
 GearGuide.lua
 Core.lua
+TipFallback.lua
 Marks.lua
 Market.lua
 Check.lua

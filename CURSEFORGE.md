@@ -6,8 +6,8 @@ A plugin for Daylight UI, by Glowey (not part of Daylight UI itself: report its 
 
 ---
 
-## New in 1.0.4
-- **Docks to the game's Auction House too:** if you use the game's own Auction House window instead of Daylight UI's, the Gear window now sits flush against it, follows it and folds to its tab, just as it does beside Daylight UI's.
+## New in 1.0.5
+- **Gear Advice on any tooltip:** the Gear Advice row now shows on item tooltips even with Daylight UI's tooltips switched off, or with another addon drawing your tooltips. Before, it only showed in Daylight UI's own tooltips.
 ---
 
 ## What's in it

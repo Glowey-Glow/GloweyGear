@@ -562,6 +562,9 @@ function Marks.Register()
 		local ok, err = pcall(me.AddTooltipLines, "item", OnItemTooltip)
 		if not ok then geterrorhandler()(err) end
 	end
+	-- (With Daylight UI's tooltips off, or another addon drawing them: the same row, written
+	-- into the game's own tooltip. TipFallback.lua)
+	if ns.TipFallback then ns.TipFallback(OnItemTooltip) end
 	-- The bags: Daylight UI's stand-in exists from the moment its bags load, which can be after
 	-- this plugin, so it is looked for at "Login" (every addon is loaded by then).
 	local api = BagShim()

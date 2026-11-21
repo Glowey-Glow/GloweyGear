@@ -1,5 +1,8 @@
 # Glowey's Gear (DaylightUI Plugin)
 
+## 1.0.5
+- The Gear Advice row shows on item tooltips without Daylight UI's tooltips too. Until now the row was handed to Daylight UI's Tooltip module, which only draws plugins' lines while it draws the tooltips itself: with that module switched off, or another addon styling the tooltips in its place, the row was gone. It is now written into the game's own tooltip in those cases, so the game's look or the other addon shows it. With Daylight UI's tooltips on, nothing changes.
+
 ## 1.0.4
 - The window docks to the game's own Auction House window too. Until now it only docked to Daylight UI's Auction House, so a player who keeps the game's window (Daylight UI's Auction House switched off, or an addon built on the game's window) got it loose on the screen. It now sits flush against that window's right edge (the left one when the right has no room), follows it, and folds to its tab the same way. Daylight UI's window still comes first when it is the one in use.
 - Beside the game's window a click on a row still says what to type in its search box: only Daylight UI's Buy page takes the search by itself.
