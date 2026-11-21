@@ -734,6 +734,7 @@ if ns.Guide and ns.Guide.HelpGroup then table.insert(pages[1].groups, ns.Guide.H
 local ok, err = pcall(function()
 	DUI:RegisterPlugin(ADDON, {
 		title = "Glowey's Gear",
+		icon = "Interface\AddOns\\" .. ADDON .. "\Media\icon-glyph.png",
 		needs = { 1, 12 },
 		short = L["Gear"],
 		color = { 0.37, 0.83, 0.55 },

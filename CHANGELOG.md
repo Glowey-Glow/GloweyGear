@@ -1,5 +1,8 @@
 # Glowey's Gear (DaylightUI Plugin)
 
+## 1.0.1
+- Glowey's Gear has its own icon: in the addon list, and on Daylight UI's options rail.
+
 ## 1.0.0
 - First release. Glowey's Gear scores gear for your spec and compares it with what you wear and carry.
 - Your spec is found from your talents (the tree with the most points); before your first talent point a Leveling profile is used. You can pick a spec yourself on the options page: Daylight UI options, Plugins, Gear.
