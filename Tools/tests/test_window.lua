@@ -31,8 +31,8 @@ local function setup(rowsFor)
 	WORLD.class, WORLD.level = "WARRIOR", 60
 	WORLD.trees = { { name = "Arms", spent = 31 }, { name = "Fury", spent = 20 }, { name = "Protection", spent = 0 } }
 	WORLD.worn, WORLD.bags = {}, {}
-	w.settings.DaylightGear = {}
-	w.dui("SettingChanged", "DaylightGear", "maxPrice")
+	w.settings.GloweyGear = {}
+	w.dui("SettingChanged", "GloweyGear", "maxPrice")
 	w.dui("Login")
 	ah.rows = {}
 	for _, r in ipairs(rowsFor) do
@@ -599,12 +599,12 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 
 	-- folded: only the tab, at the host's corner; remembered
 	f.close:Click()
-	T.check(not f:IsShown() and tab:IsShown(), "the X folds it to its tab"); T.eq(DaylightGearDB.window.folded, true, "remembered")
+	T.check(not f:IsShown() and tab:IsShown(), "the X folds it to its tab"); T.eq(GloweyGearDB.window.folded, true, "remembered")
 	T.check(tab.points[1][2] == host and tab.points[1][1] == "TOPLEFT" and tab.points[1][3] == "TOPRIGHT",
 		"the tab at the host's top right corner")
 	tab.scripts.OnEnter(tab); tab.scripts.OnLeave(tab)
 	tab:Click()
-	T.check(f:IsShown(), "the tab opens it again"); T.eq(DaylightGearDB.window.folded, nil, "remembered too")
+	T.check(f:IsShown(), "the tab opens it again"); T.eq(GloweyGearDB.window.folded, nil, "remembered too")
 
 	-- the host moves: no room on the right, then on neither side
 	host.rect = { 900, 1860, 900 }
@@ -625,7 +625,7 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	-- Escape belongs to the Auction House window while docked: ours is not on the game's list
 	local function special()
 		for _, name in ipairs(UISpecialFrames) do
-			if name == "DaylightGearWindow" then return true end
+			if name == "GloweyGearWindow" then return true end
 		end
 		return false
 	end
@@ -653,7 +653,7 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	function f.GetLeft() return 700 end
 	function f.GetTop() return 650 end
 	f.scripts.OnDragStart(f); f.scripts.OnDragStop(f)
-	T.eq(DaylightGearDB.window.x, 700, "its place is kept"); T.eq(DaylightGearDB.window.y, 650, "both ways")
+	T.eq(GloweyGearDB.window.x, 700, "its place is kept"); T.eq(GloweyGearDB.window.y, 650, "both ways")
 	Window.Close(); Window.Open()
 	T.check(f.points[1][1] == "TOPLEFT" and f.points[1][4] == 700 and f.points[1][5] == 650, "and it opens there again")
 

@@ -737,7 +737,7 @@ function Window.Search(row)
 end
 
 -- =============================================================================================
--- Saved state: DaylightGearDB.window = { folded = bool, x =, y = } (per account)
+-- Saved state: GloweyGearDB.window = { folded = bool, x =, y = } (per account)
 -- =============================================================================================
 local function Saved()
 	local db = ns.DB()
@@ -1239,7 +1239,7 @@ local function PaintGrip(t, hover)
 end
 
 local function BuildTab()
-	local t = CreateFrame("Button", "DaylightGearWindowTab", UIParent)
+	local t = CreateFrame("Button", "GloweyGearWindowTab", UIParent)
 	t:SetSize(14, 34)
 	t:SetFrameStrata("MEDIUM")
 	t:Hide()
@@ -1285,7 +1285,7 @@ local function Build()
 			return nil
 		end
 	end
-	local f = CreateFrame("Frame", "DaylightGearWindow", UIParent)
+	local f = CreateFrame("Frame", "GloweyGearWindow", UIParent)
 	f:SetSize(WIDTH, 200)
 	f:SetFrameStrata("MEDIUM")
 	f:SetToplevel(true)
@@ -1422,12 +1422,12 @@ local function Special(on)
 	local list = UISpecialFrames
 	if type(list) ~= "table" then return end
 	for i = #list, 1, -1 do
-		if list[i] == "DaylightGearWindow" then
+		if list[i] == "GloweyGearWindow" then
 			if on then return end
 			table.remove(list, i)
 		end
 	end
-	if on then list[#list + 1] = "DaylightGearWindow" end
+	if on then list[#list + 1] = "GloweyGearWindow" end
 end
 
 -- Puts the window and its tab where the mode says. Our frames are never protected, so this is

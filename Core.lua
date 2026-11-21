@@ -187,7 +187,7 @@ function ns.RankOptions(level)
 end
 
 -- ---------------------------------------------------------------------------------------------
--- Saved variables: DaylightGearDB (what is not a setting)
+-- Saved variables: GloweyGearDB (what is not a setting)
 -- ---------------------------------------------------------------------------------------------
 --   v            the shape's version, for Migrate
 --   updateCheck  Update.lua's switch (false = off)
@@ -209,10 +209,10 @@ end
 
 local migrated   -- the table Migrate has been through this session
 function ns.DB()
-	local db = _G.DaylightGearDB
+	local db = _G.GloweyGearDB
 	if type(db) ~= "table" then
 		db = { v = DB_VERSION }
-		_G.DaylightGearDB = db
+		_G.GloweyGearDB = db
 	end
 	if migrated ~= db then
 		Migrate(db)

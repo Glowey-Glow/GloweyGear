@@ -4,7 +4,7 @@ The first run (2026-11-20) found lag with the window up at a large Auction House
 
 **Before you start**
 
-1. Link the folder into the game: `D:\World of Warcraft\_forever_\Interface\AddOns\DaylightGear` must point at `E:\daylight\DaylightGear` (a junction, like the other plugins).
+1. Link the folder into the game: `D:\World of Warcraft\_forever_\Interface\AddOns\GloweyGear` must point at `E:\daylight\GloweyGear` (a junction, like the other plugins).
 2. Turn BugSack on (or `/console scriptErrors 1`).
 3. Log in on a character with talents spent and some gear in the bags. A healer or caster is the most useful first character.
 

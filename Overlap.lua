@@ -127,7 +127,7 @@ function Overlap.Ours(surface)
 	return not (type(ns.ModuleOff) == "function" and ns.ModuleOff("Tooltip"))
 end
 
--- DaylightGearDB.overlap = { asked = { ["Addon:surface"] = true },
+-- GloweyGearDB.overlap = { asked = { ["Addon:surface"] = true },
 --                            took = { [character GUID] = { ["Addon:surface"] = its value before } } }
 -- What was taken is kept PER CHARACTER: Polestar's settings follow its own profiles, and a
 -- value taken on one character's profile must be put back there, not on another's.
@@ -311,7 +311,7 @@ local W, PAD, ROW = 520, 18, 58
 local LABEL = { bags = L["Upgrade Marks on Bags"], tips = L["Upgrade Advice on Tooltips"] }
 local frame
 local rows = {}
-local GUIDE_KEY = "DaylightGearOverlap"
+local GUIDE_KEY = "GloweyGearOverlap"
 local DAYLIGHT_DIALOGS = { "DaylightUIInstaller", "DaylightUITour", "DaylightUITourAsk", "DaylightUIAsk",
 	"DaylightUIQuestieChoice", "DaylightAddonSkinsChoices" }
 
@@ -345,7 +345,7 @@ local function Build()
 	for _, name in ipairs({ "Skin", "Text", "Button", "Close", "Switch", "Colors" }) do
 		if type(API[name]) ~= "function" then return nil end
 	end
-	local f = CreateFrame("Frame", "DaylightGearOverlap", UIParent)
+	local f = CreateFrame("Frame", "GloweyGearOverlap", UIParent)
 	f:SetSize(W, 240)
 	f:SetPoint("CENTER", 0, 60)
 	f:SetFrameStrata("DIALOG")
@@ -360,7 +360,7 @@ local function Build()
 	API.Skin(f, { window = true })
 	f:HookScript("OnShow", function() SetBusy(true) end)
 	f:HookScript("OnHide", function() SetBusy(false) end)
-	if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "DaylightGearOverlap") end
+	if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "GloweyGearOverlap") end
 
 	f.title = API.Text(f, "title", "LEFT")
 	f.title:SetPoint("TOPLEFT", PAD, -PAD)

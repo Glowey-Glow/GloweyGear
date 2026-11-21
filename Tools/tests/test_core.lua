@@ -10,7 +10,7 @@ local function read(rel)
 	handle:close()
 	return source
 end
-local function run(rel, ns) return assert(loadstring(read(rel), "@" .. rel))("DaylightGear", ns) end
+local function run(rel, ns) return assert(loadstring(read(rel), "@" .. rel))("GloweyGear", ns) end
 
 -- ---- the game and Daylight UI, as far as Core.lua touches them ---------------------------------
 local timers, frames, handlers, commands, settings, registered = {}, {}, {}, {}, {}, {}
@@ -39,7 +39,7 @@ end
 DaylightUI = {
 	API = {
 		major = 1, minor = 12,
-		GetSetting = function(scope, path) if scope == "DaylightGear" then return settings[path] end end,
+		GetSetting = function(scope, path) if scope == "GloweyGear" then return settings[path] end end,
 		For = function(name)
 			return {
 				name = name,
@@ -63,11 +63,11 @@ run("Core.lua", NS)
 T.case("it registers as a Daylight UI plugin", function()
 	T.eq(NS.ok, true, "Core ran to its end")
 	local p = registered.plugin
-	T.eq(p.name, "DaylightGear", "under the addon's folder name")
+	T.eq(p.name, "GloweyGear", "under the addon's folder name")
 	T.eq(p.spec.title, "Glowey's Gear", "a clean title"); T.check(not p.spec.title:find("|"), "no color codes in the title")
 	T.eq(p.spec.needs[1], 1, "API major"); T.eq(p.spec.needs[2], 12, "API minor (tooltip rows are 1.12)")
 	T.eq(p.spec.short, "Gear", "the rail name"); T.check(type(p.spec.blurb) == "string" and #p.spec.blurb > 0, "a blurb")
-	T.eq(registered.module.def.plugin, "DaylightGear", "its module belongs to the plugin")
+	T.eq(registered.module.def.plugin, "GloweyGear", "its module belongs to the plugin")
 	T.eq(#NS.dataProblems, 0, "the weights loaded clean")
 end)
 
@@ -135,10 +135,10 @@ T.case("login, the spec picker and the saved choice", function()
 	dui("Login")
 	local who = NS.Who()
 	T.eq(who.class, "DRUID", "class"); T.eq(who.spec, "FERAL_CAT", "the tree with the points"); T.eq(who.level, 30, "level")
-	T.eq(DaylightGearDB.v, 2, "the saved table has its version"); T.eq(type(DaylightGearDB.houses), "table", "and its parts")
-	local mine = DaylightGearDB.chars[WORLD.guid]
+	T.eq(GloweyGearDB.v, 2, "the saved table has its version"); T.eq(type(GloweyGearDB.houses), "table", "and its parts")
+	local mine = GloweyGearDB.chars[WORLD.guid]
 	T.check(mine ~= nil, "this character's record is kept under its GUID"); T.eq(mine.name, "Tester", "with its name, for a person reading the file")
-	T.eq(DaylightGearDB.chars["Test Realm-Tester"], nil, "and not under realm and name")
+	T.eq(GloweyGearDB.chars["Test Realm-Tester"], nil, "and not under realm and name")
 	T.eq(mine.spec, "auto", "this character starts on Auto"); T.eq(mine.last, "FERAL_CAT", "and remembers what Auto found")
 	T.eq(NS.SpecValues.auto, "Auto", "the picker has Auto")
 	T.eq(NS.SpecValues.FERAL_CAT, "Wilder Kampf", "a tree's spec shows the game's own tree name")
@@ -169,7 +169,7 @@ T.case("before the game has tree names, the picker still has words", function()
 	dui("Login")
 	T.eq(NS.SpecValues.BEAST_MASTERY, "Beast Mastery", "the key as words")
 	T.eq(NS.Who().spec, "LEVELING", "no talents readable and nothing remembered: the class default")
-	T.eq(DaylightGearDB.chars[WORLD.guid].last, "FERAL_CAT", "a default is never written over what Auto last found")
+	T.eq(GloweyGearDB.chars[WORLD.guid].last, "FERAL_CAT", "a default is never written over what Auto last found")
 	for _ = 1, 8 do tick() end   -- (the looks for the talent trees after login run out)
 	T.eq(#timers, 0, "the looks after login end by themselves")
 end)
@@ -178,7 +178,7 @@ T.case("verdicts through the engine, settings and events", function()
 	T.reset()
 	WORLD.class, WORLD.level = "WARRIOR", 60
 	WORLD.trees = { { name = "Arms", spent = 31 }, { name = "Fury", spent = 20 }, { name = "Protection", spent = 0 } }
-	DaylightGearDB.chars[WORLD.guid].last = nil
+	GloweyGearDB.chars[WORLD.guid].last = nil
 	dui("Login")
 	local worn = T.item({ equipLoc = "INVTYPE_HEAD", subclassID = 4, raw = { ITEM_MOD_STRENGTH_SHORT = 10 } })
 	local better = T.item({ equipLoc = "INVTYPE_HEAD", subclassID = 4, raw = { ITEM_MOD_STRENGTH_SHORT = 15 } })
@@ -198,16 +198,16 @@ T.case("verdicts through the engine, settings and events", function()
 	none, why = NS.Verdict(T.item({ equipLoc = "INVTYPE_HEAD", loaded = false }))
 	T.eq(none, nil, "no verdict yet"); T.eq(why, "pending", "not loaded yet")
 	settings.enabled = false
-	dui("SettingChanged", "DaylightGear", "enabled")
+	dui("SettingChanged", "GloweyGear", "enabled")
 	none, why = NS.Verdict(better, true)
 	T.eq(none, nil, "switched off"); T.eq(why, "off", "says so")
 	settings.enabled = nil
 	dui("SettingChanged", "OtherAddon", "enabled")
 	T.eq(NS.Get("enabled"), false, "another addon's setting does not clear our cache")
-	dui("SettingChanged", "DaylightGear", "enabled")
+	dui("SettingChanged", "GloweyGear", "enabled")
 	T.eq(NS.Get("enabled"), true, "ours does; unset reads the default")
 	T.eq(NS.Get("minGain"), 3, "a default"); settings.maxPrice = 20
-	dui("SettingChanged", "DaylightGear", "maxPrice")
+	dui("SettingChanged", "GloweyGear", "maxPrice")
 	local opts = NS.RankOptions(60)
 	T.eq(opts.maxPrice, 200000, "max price in copper"); T.eq(opts.minPct, 3, "smallest gain"); T.eq(opts.mode, "perGold", "mode")
 	-- a level-up changes who is scored for
@@ -264,7 +264,7 @@ end)
 T.case("talents not readable at login, readable later (the audit's M5)", function()
 	for _ = 1, 8 do tick() end
 	T.reset()
-	DaylightGearDB.chars = {}
+	GloweyGearDB.chars = {}
 	WORLD.class, WORLD.level, WORLD.trees = "WARRIOR", 60, nil
 	local listening = {}
 	for _, f in ipairs(frames) do
@@ -287,13 +287,13 @@ T.case("talents not readable at login, readable later (the audit's M5)", functio
 	who = NS.Who()
 	T.eq(who.spec, "FURY", "the real spec once the trees are readable"); T.eq(who.how, "talents", "from talents")
 	T.eq(changed, 1, "a burst of talent events is one look"); T.eq(NS.SpecValues.FURY, "Fury", "and the picker has the game's names")
-	T.eq(DaylightGearDB.chars[WORLD.guid].last, "FURY", "remembered for the next login")
+	T.eq(GloweyGearDB.chars[WORLD.guid].last, "FURY", "remembered for the next login")
 	for _ = 1, 8 do tick() end
 	T.eq(changed, 1, "the looks on a timer find nothing left to do")
 
 	-- no event at all: a look on a timer finds the trees
 	T.reset()
-	DaylightGearDB.chars = {}
+	GloweyGearDB.chars = {}
 	WORLD.class, WORLD.level, WORLD.trees = "WARRIOR", 60, nil
 	dui("Login")
 	T.eq(NS.Who().spec, "LEVELING", "default again")
@@ -307,7 +307,7 @@ T.case("talents not readable at login, readable later (the audit's M5)", functio
 
 	-- in a fight nothing is read; it is when the fight ends
 	T.reset()
-	DaylightGearDB.chars = {}
+	GloweyGearDB.chars = {}
 	WORLD.class, WORLD.level, WORLD.trees = "WARRIOR", 60, nil
 	dui("Login")
 	T.eq(NS.Who().spec, "LEVELING", "default before the trees")
@@ -329,13 +329,13 @@ T.case("characters are kept by GUID, whatever the realm is called", function()
 	WORLD.class, WORLD.level = "WARRIOR", 60
 	WORLD.trees = { { name = "Arms", spent = 31 }, { name = "Fury", spent = 5 }, { name = "Protection", spent = 15 } }
 	-- the game gives no realm name (as on this client since 2026-11-20)
-	DaylightGearDB.chars = {}
+	GloweyGearDB.chars = {}
 	WORLD.realm = ""
 	dui("Login")
 	NS.Who()
-	local mine = DaylightGearDB.chars[WORLD.guid]
+	local mine = GloweyGearDB.chars[WORLD.guid]
 	T.check(mine ~= nil, "a record under the GUID with an empty realm name")
-	T.eq(DaylightGearDB.chars["-Tester"], nil, "and none under a key made of an empty realm")
+	T.eq(GloweyGearDB.chars["-Tester"], nil, "and none under a key made of an empty realm")
 	mine.spec = "FURY"
 	-- another character of the same name on another realm: another GUID, another record
 	WORLD.guid = "Player-5555-0BADF00D"
@@ -345,24 +345,24 @@ T.case("characters are kept by GUID, whatever the realm is called", function()
 	T.eq(NS.Char().spec, "FURY", "and the first keeps its choice")
 
 	-- records saved by an older build under "Realm-Name" are taken over, once, and left in place
-	DaylightGearDB.chars = { ["Test Realm-Tester"] = { spec = "PROTECTION", last = "ARMS" }, ["Other Realm-Somebody"] = { spec = "FURY" } }
+	GloweyGearDB.chars = { ["Test Realm-Tester"] = { spec = "PROTECTION", last = "ARMS" }, ["Other Realm-Somebody"] = { spec = "FURY" } }
 	WORLD.realm = "Test Realm"
 	local c = NS.Char()
 	T.eq(c.spec, "PROTECTION", "the record under today's realm name is this character's"); T.eq(c.last, "ARMS", "with what Auto last found")
-	T.check(DaylightGearDB.chars["Test Realm-Tester"] ~= nil, "the old record is left where it was")
+	T.check(GloweyGearDB.chars["Test Realm-Tester"] ~= nil, "the old record is left where it was")
 	-- with no realm name: the only old record that ends in the character's name
-	DaylightGearDB.chars = { ["Test Realm-Tester"] = { spec = "FURY" }, ["Test Realm-Somebody"] = { spec = "ARMS" } }
+	GloweyGearDB.chars = { ["Test Realm-Tester"] = { spec = "FURY" }, ["Test Realm-Somebody"] = { spec = "ARMS" } }
 	WORLD.realm = ""
 	T.eq(NS.Char().spec, "FURY", "one old record with this name: taken")
 	-- two to choose from: none is taken
-	DaylightGearDB.chars = { ["Realm A-Tester"] = { spec = "FURY" }, ["Realm B-Tester"] = { spec = "ARMS" } }
+	GloweyGearDB.chars = { ["Realm A-Tester"] = { spec = "FURY" }, ["Realm B-Tester"] = { spec = "ARMS" } }
 	T.eq(NS.Char().spec, "auto", "two old records with this name: Auto, not a guess")
 	-- the game does not know the character yet
 	WORLD.guid = nil
 	T.eq(NS.Char(), nil, "no GUID yet: no record, and nothing written")
 	WORLD.guid = "Player-4407-00ABCDEF"
 	-- an older saved table is brought to today's version
-	DaylightGearDB = { v = 1, chars = { ["Test Realm-Tester"] = { spec = "ARMS" } } }
+	GloweyGearDB = { v = 1, chars = { ["Test Realm-Tester"] = { spec = "ARMS" } } }
 	WORLD.realm = "Test Realm"
 	T.eq(NS.DB().v, 2, "version 1 becomes 2"); T.eq(NS.Char().spec, "ARMS", "and the character's choice comes along")
 	for _ = 1, 8 do tick() end
@@ -370,12 +370,12 @@ end)
 
 T.case("a setting read before Daylight UI has it is not kept as the default (the audit's L16)", function()
 	settings.minGain = nil
-	dui("SettingChanged", "DaylightGear", "minGain")
+	dui("SettingChanged", "GloweyGear", "minGain")
 	T.eq(NS.Get("minGain"), 3, "no value yet: the default")
 	settings.minGain = 7   -- (the module is switched on later; no SettingChanged comes for that)
 	T.eq(NS.Get("minGain"), 7, "the real value is found at the next read")
 	settings.minGain = nil
-	dui("SettingChanged", "DaylightGear", "minGain")
+	dui("SettingChanged", "GloweyGear", "minGain")
 end)
 
 T.case("item data arriving does not rebuild what is owned unless some of it was waiting (the audit's L5)", function()
@@ -458,7 +458,7 @@ end)
 
 T.case("/gear debug names what the first run needs", function()
 	T.reset()
-	DaylightGearDB.chars = {}
+	GloweyGearDB.chars = {}
 	WORLD.class, WORLD.level, WORLD.realm = "WARRIOR", 60, ""
 	WORLD.trees = { { name = "Arms", spent = 31 }, { name = "Fury", spent = 5 }, { name = "Protection", spent = 15 } }
 	dui("Login")

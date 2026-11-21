@@ -56,7 +56,7 @@ local function settle(limit)
 	end
 	return Market.State() ~= "reading"
 end
-local function saved() return DaylightGearDB.houses[Market.House()] end
+local function saved() return GloweyGearDB.houses[Market.House()] end
 local function priceOf(link)
 	local list = Market.List()
 	local want = "item:" .. Stats.Key(link)
@@ -310,7 +310,7 @@ end)
 
 T.case("our own read: only when allowed, once in 15 minutes", function()
 	fresh()
-	DaylightGearDB.houses = {}
+	GloweyGearDB.houses = {}
 	Market.Prune()
 	close()
 	w.settings.AuctionHouse.enabled = false     -- the player keeps the game's own window
@@ -389,7 +389,7 @@ end)
 
 T.case("what is saved, and old houses pruned at login", function()
 	local now = GetServerTime()
-	DaylightGearDB.houses = {
+	GloweyGearDB.houses = {
 		["US-PvE"] = { at = now - 100, rows = 9, by = "dui", items = { "1001#500", "1002::::::::::::1:12745#70000", "broken", "#5", "1003#0" } },
 		["US-Old"] = { at = now - 31 * 86400, rows = 1, by = "dui", items = { "1#1" } },
 		["US-Asked"] = { asked = now - 5 },
@@ -397,7 +397,7 @@ T.case("what is saved, and old houses pruned at login", function()
 		junk = "text",
 	}
 	w.dui("Login")
-	local houses = DaylightGearDB.houses
+	local houses = GloweyGearDB.houses
 	T.check(houses["US-PvE"] ~= nil and houses["US-Recent"] ~= nil and houses["US-Asked"] ~= nil, "recent houses stay")
 	T.eq(houses["US-Old"], nil, "a house not read for 30 days goes"); T.eq(houses.junk, nil, "and what is not a house")
 	local list = Market.List()

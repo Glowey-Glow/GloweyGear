@@ -289,7 +289,7 @@ end
 --   w.update()                         every frame's OnUpdate, once
 function T.world()
 	local w = { time = 1000, spent = 0, clockStep = 0.05, timers = {}, frames_ = {}, handlers = {}, commands = {},
-		settings = { DaylightGear = {}, AuctionHouse = { enabled = true } }, printed = {}, set_ = {} }
+		settings = { GloweyGear = {}, AuctionHouse = { enabled = true } }, printed = {}, set_ = {} }
 	local function def(name, value) rawset(_G, name, value) end
 
 	local function read(rel)
@@ -298,7 +298,7 @@ function T.world()
 		handle:close()
 		return source
 	end
-	function w.load(rel) return assert(loadstring(read(rel), "@" .. rel))("DaylightGear", NS) end
+	function w.load(rel) return assert(loadstring(read(rel), "@" .. rel))("GloweyGear", NS) end
 
 	-- time
 	NS.Game.Clock = function()
@@ -390,7 +390,7 @@ function T.world()
 	def("GetRealmName", function() return "Test Realm" end)
 	def("UnitFactionGroup", function() return "Alliance" end)
 	def("issecretvalue", false)
-	def("DaylightGearDB", {})
+	def("GloweyGearDB", {})
 	def("print", function(...)
 		local parts = {}
 		for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
@@ -489,7 +489,7 @@ function T.world()
 	function w.dui(event, ...)
 		for _, fn in ipairs(w.handlers[event] or {}) do fn(...) end
 	end
-	function w.set(path, value) dui:Set("DaylightGear", path, value) end
+	function w.set(path, value) dui:Set("GloweyGear", path, value) end
 
 	w.load("Locales/Locales.lua")
 	w.load("Data/Weights.lua")

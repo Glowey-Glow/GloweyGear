@@ -6,7 +6,7 @@ path = sys.argv[1]
 src = open(path, encoding='utf-8').read()
 rt = l51.LuaRuntime()
 ns = rt.eval('{}')
-rt.eval('function(src, ns) local f = assert(loadstring(src, "@Weights.lua")) f("DaylightGear", ns) end')(src, ns)
+rt.eval('function(src, ns) local f = assert(loadstring(src, "@Weights.lua")) f("GloweyGear", ns) end')(src, ns)
 D = ns.WeightData
 
 KEYS = set('''STR AGI STA INT SPI ARMOR HEALTH MANA AP RAP FERAL_AP SPELL_DMG HEAL SPELL_DMG_ARCANE SPELL_DMG_FIRE

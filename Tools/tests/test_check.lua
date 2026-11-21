@@ -44,11 +44,11 @@ local function setup(rowsFor)
 		ah.open = false
 		w.fire("AUCTION_HOUSE_CLOSED")
 	end
-	DaylightGearDB.houses = {}
+	GloweyGearDB.houses = {}
 	WORLD.class, WORLD.level = "WARRIOR", 60
 	WORLD.trees = { { name = "Arms", spent = 31 }, { name = "Fury", spent = 20 }, { name = "Protection", spent = 0 } }
 	WORLD.worn, WORLD.bags = {}, {}
-	w.settings.DaylightGear = {}
+	w.settings.GloweyGear = {}
 	w.settings.AuctionHouse = { enabled = true }
 	w.searches, w.buying = {}, nil
 	w.dui("Login")

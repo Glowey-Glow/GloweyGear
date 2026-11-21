@@ -36,7 +36,7 @@ def main():
     compile_(text(os.path.join(HERE, "mocks.lua")), "@mocks.lua")()
     as_addon = state.eval("function(chunk, addon) return chunk(addon, NS) end")
     for name in ENGINE:
-        as_addon(compile_(text(os.path.join(root, name)), "@" + name), "DaylightGear")
+        as_addon(compile_(text(os.path.join(root, name)), "@" + name), "GloweyGear")
     started = time.time()
     print("plugin files from: " + root)
     print(compile_(text(os.path.join(HERE, "bench.lua")), "@bench.lua")())

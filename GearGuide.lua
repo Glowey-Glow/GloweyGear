@@ -36,7 +36,7 @@ local NEWS = {
 
 Guide.Setup({
 	name = "Glowey's Gear",
-	db = function() return _G.DaylightGearDB end,
+	db = function() return _G.GloweyGearDB end,
 	-- (The guide ships with the first version: nobody had the plugin before it.)
 	existing = function() return false end,
 	intro = L["Glowey's Gear scores gear for your spec and tells you what is an upgrade over what you wear and carry."],

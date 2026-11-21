@@ -326,7 +326,7 @@ local function character(class, level, trees, wornLevel)
 		cached[n] = true
 		WORLD.bags[i] = T.item({ id = n, equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = 1, raw = { ITEM_MOD_STAMINA_SHORT = i } })
 	end
-	DaylightGearDB.chars = {}
+	GloweyGearDB.chars = {}
 	w.dui("Login")
 end
 
@@ -369,7 +369,7 @@ measure("1a. the scan is read (window up)", 240, function() return Market.State(
 report[#report + 1] = ("      market: %s; saved items %d"):format(tostring(Market.State()), Market.List() and #Market.List().links or 0)
 report[#report + 1] = jobLine()
 do
-	local e = DaylightGearDB.houses[Market.House()]
+	local e = GloweyGearDB.houses[Market.House()]
 	local bytes = 0
 	for _, s in ipairs(e and e.items or {}) do bytes = bytes + #s + 17 end   -- (17: a Lua string's own header, about)
 	report[#report + 1] = ("      saved list: %d strings, about %.0f KB in memory, %.0f KB in the saved-variables file"):format(

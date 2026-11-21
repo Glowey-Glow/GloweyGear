@@ -6,7 +6,7 @@
 ## X-Credits: Some stat weights are derived from wowsims (MIT, Copyright (c) 2022 wowsims team): see CREDITS.md.
 ## Version: @project-version@
 ## Dependencies: DaylightUI
-## SavedVariables: DaylightGearDB
+## SavedVariables: GloweyGearDB
 
 Locales\Locales.lua
 Locales\deDE.lua

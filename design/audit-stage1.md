@@ -12,7 +12,7 @@ numbers below are from the files after that pass. Tests were run before and afte
 **Tests.** `python -I Tools\tests\run.py`: 11 files, 0 failed (7,737 checks), both times.
 `Tools\locales.py`: 111 keys, 6 languages, 0 findings.
 
-**Not installed yet.** There is no `DaylightGear` folder or junction in
+**Not installed yet.** There is no `GloweyGear` folder or junction in
 `D:\World of Warcraft\_forever_\Interface\AddOns`. It will not load until it is linked there.
 
 **Short answer.** Nothing was found that would throw at login, taint a secure path or call a scan
@@ -210,12 +210,12 @@ with CheapUpgrades, which was not opened.
   equals the installed API (1.12). `short` is "Gear". Title carries the tag.
 - Every options row passes `Options\Registry.lua:55-108`: defaults present and in range, dropdown
   defaults among the values, the keyless Spec dropdown has `get`, `set` and a function `default`,
-  `disabled` functions take `get`. Page id `DaylightGear.gear`.
+  `disabled` functions take `get`. Page id `GloweyGear.gear`.
 - `/dui gear`: `me.RegisterCommand(word, fn, help)` is the real way (`API.lua:1802-1811`); "gear" is
   not taken. `/gear` is set through `SlashCmdList` at file scope.
 - Saved variables declared; `Guide.lua` creates the table on a first launch, `ns.DB()` migrates it.
 - `Guide.lua` is byte-identical to Essentials'; `Update.lua` differs only in `PREFIX`
-  ("DaylightGear", 12 characters).
+  ("GloweyGear", 12 characters).
 
 **Game calls** (each against the generated docs)
 - `GetReplicateItemInfo`: name 1, count 3, buyout 10, owner 14, itemID 17, hasAllInfo 18

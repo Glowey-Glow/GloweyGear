@@ -7,7 +7,7 @@ ignore = { "212/_.*", "213/_.*" }
 
 -- Globals this addon sets: its saved variables.
 globals = {
-	"DaylightGearDB",
+	"GloweyGearDB",
 }
 
 -- The WoW client's API and constants this addon reads. Game.lua, Core.lua and Update.lua name

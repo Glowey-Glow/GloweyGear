@@ -20,7 +20,7 @@
 --     level or what is worn and carried: those change the picks with nothing new for sale;
 --   * never in a fight (nothing is remembered then either, so the news keeps);
 --   * off with the Chat Alert switch, and with Show Gear Advice.
--- What is remembered is per character: DaylightGearDB.chars[guid].seen =
+-- What is remembered is per character: GloweyGearDB.chars[guid].seen =
 --   { house = , spec = , mode = , slots = { [group] = { key, measure } } }.
 -- Limit: the list is scored while the Upgrades for Sale window is up (docked beside the Auction
 -- House, it is), so that is when news is found.

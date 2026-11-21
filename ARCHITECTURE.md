@@ -35,7 +35,7 @@ Load order is the `.toc`'s.
 | `Score.lua` | Weighted sum; who can wear what; dual wield | 164 | `test_score.lua` |
 | `Compare.lua` | What a candidate replaces; best of worn and carried; the percent | 318 | `test_compare.lua` |
 | `Rank.lua` | Scoring job in slices; filter, order, group | 198 | `test_rank.lua` |
-| `Update.lua`, `Guide.lua` | Shared with the owner's other plugins (newer-version alert, PREFIX `DaylightGear`; tours, welcome, What's New, `ns.Pad`). Never edited here | 135, 900 | |
+| `Update.lua`, `Guide.lua` | Shared with the owner's other plugins (newer-version alert, PREFIX `GloweyGear`; tours, welcome, What's New, `ns.Pad`). Never edited here | 135, 900 | |
 | `GearGuide.lua` | This plugin's welcome, tour and What's New | 105 | `test_marks.lua` |
 | `Core.lua` | Settings, saved variables, bus, events, who and owned caches, verdicts, `/gear`, registration, options page | 575 | `test_core.lua` |
 | `Marks.lua` | Tooltip row and bag corner mark | 495 | `test_marks.lua` |
@@ -135,10 +135,10 @@ Listeners: `Marks.lua` on "WhoChanged" / "OwnedChanged" / "Setting" drops its pe
 
 Settings live in Daylight UI's profile under the plugin's name (read with `API.GetSetting`, defaults in `Core.lua`'s `DEFAULTS`; a default is given but not cached while Daylight UI has no value yet): `enabled`, `minGain`, `bestArmor`, `maxPrice` (gold), `mode`, `tooltips`, `bagMarks`, `bagCorner` (default `bottom_right`), `dock`.
 
-What is not a setting is `DaylightGearDB`, per account:
+What is not a setting is `GloweyGearDB`, per account:
 
 ```lua
-DaylightGearDB = {
+GloweyGearDB = {
 	v = 2,                         -- shape version; Core.lua's Migrate() steps old shapes forward
 	updateCheck = false,           -- Update.lua's switch (absent = on)
 	guide = { ... },               -- Guide.lua's own keys
@@ -331,7 +331,7 @@ What only the game can answer is `design\in-game-check.md`, a numbered run, with
 ## 12. Where the study was wrong or had to change
 
 1. **License** (D3): All Rights Reserved; nothing GPL-3 is in the plugin.
-2. **Saved variable name**: `DaylightGearDB` (the shared `Update.lua` derives `ADDON .. "DB"`), not the study's `GloweyGearDB`.
+2. **Saved variable name**: `GloweyGearDB` (the shared `Update.lua` derives `ADDON .. "DB"`), not the study's `GloweyGearDB`.
 3. **Spec detection**: the client's talent window reads the spec group's combat config and the three trait groups' spent points (`FX:Blizzard_PlayerSpells\Camelot\ClassTalents\Blizzard_ClassTalentsFrame.lua:86-120`), five calls with no node walk; that is what `Game.Trees()` does, not the study's `GetActiveConfigID` and node walk.
 4. **Improvement per gold**: a floor, `max(price, pocket change)`, written independently of the reference addon's form.
 5. **Usability**: our own class table plus the character's learned weapon skills (the client's own subclass-to-skill table), no tooltip read.

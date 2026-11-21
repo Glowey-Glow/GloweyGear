@@ -21,7 +21,7 @@ import lupa.lua51 as lua51
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-ADDON = "DaylightGear"
+ADDON = "GloweyGear"
 # The engine, pure Lua. The .toc must list every one of these, in an order that works.
 ENGINE = ["Stats.lua", "Spec.lua", "Score.lua", "Compare.lua", "Rank.lua"]
 

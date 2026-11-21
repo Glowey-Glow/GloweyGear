@@ -12,7 +12,7 @@ local function read(rel)
 	handle:close()
 	return source
 end
-local function run(rel, ns) return assert(loadstring(read(rel), "@" .. rel))("DaylightGear", ns) end
+local function run(rel, ns) return assert(loadstring(read(rel), "@" .. rel))("GloweyGear", ns) end
 
 -- ---- the game and Daylight UI, as far as Core.lua and Marks.lua touch them ---------------------
 local timers, frames, handlers, settings, tipLines, textures
@@ -55,7 +55,7 @@ local function dui(event, ...)
 end
 local function set(path, value)
 	settings[path] = value
-	dui("SettingChanged", "DaylightGear", path)
+	dui("SettingChanged", "GloweyGear", path)
 end
 
 -- Daylight UI's bags: the stand-in records what is registered and how often a repaint is asked.
@@ -84,13 +84,13 @@ local function boot(opts)
 	timers, frames, handlers, settings, tipLines, textures = {}, {}, {}, {}, {}, 0
 	combat, locale = false, opts.lang or "enUS"
 	slots = {}
-	DaylightGearDB = nil
+	GloweyGearDB = nil
 	Baganator = (opts.shim == "own" and Shim(true)) or (opts.shim == "other" and Shim(nil)) or nil
 	if not opts.shim then bags = nil end
 	DaylightUI = {
 		API = {
 			major = 1, minor = 12,
-			GetSetting = function(scope, path) if scope == "DaylightGear" then return settings[path] end end,
+			GetSetting = function(scope, path) if scope == "GloweyGear" then return settings[path] end end,
 			Colors = opts.colors and function() return opts.colors end or nil,
 			For = function(name)
 				local me = {
@@ -594,10 +594,10 @@ T.case("the guide: the welcome, the tour and the Help card", function()
 		T.eq(item.type, "button", item.label .. " is a button"); T.check(type(item.func) == "function", "with something to do")
 	end
 	-- first launch: nothing answered yet, and the saved table is the plugin's own
-	fire("ADDON_LOADED", "DaylightGear")
+	fire("ADDON_LOADED", "GloweyGear")
 	T.eq(Guide.Welcoming(), true, "a new player has the welcome waiting")
-	T.eq(type(DaylightGearDB.guide), "table", "the guide keeps its keys in DaylightGearDB")
-	T.eq(DaylightGearDB.v, 2, "which Core.lua still reads as its own")
+	T.eq(type(GloweyGearDB.guide), "table", "the guide keeps its keys in GloweyGearDB")
+	T.eq(GloweyGearDB.v, 2, "which Core.lua still reads as its own")
 	T.eq(Guide.Running(), false, "no tour runs by itself")
 end)
 

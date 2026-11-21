@@ -8,7 +8,7 @@ local function load()
 	local source = handle:read("*a")
 	handle:close()
 	local ns = {}
-	assert(loadstring(source, "@Game.lua"))("DaylightGear", ns)
+	assert(loadstring(source, "@Game.lua"))("GloweyGear", ns)
 	return ns.Game
 end
 

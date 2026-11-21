@@ -9,7 +9,7 @@
 -- luacheck: read globals IsInRaid IsInGroup IsInGuild InCombatLockdown GetTime C_Timer CreateFrame
 local ADDON, ns = ...
 
-local PREFIX = "DaylightGear"              -- the addon message prefix (16 characters at most)
+local PREFIX = "GloweyGear"              -- the addon message prefix (16 characters at most)
 local DB_NAME = ADDON .. "DB"            -- the plugin's saved variables (the switch lives there)
 local L = ns.L or setmetatable({}, { __index = function(_, k) return k end })
 

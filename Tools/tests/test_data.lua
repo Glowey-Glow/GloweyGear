@@ -5,7 +5,7 @@ local Spec, Stats, Score, Compare, Rank = NS.Spec, NS.Stats, NS.Score, NS.Compar
 local handle = assert(io.open(ADDON_ROOT .. "/Data/Weights.lua", "r"))
 local source = handle:read("*a")
 handle:close()
-assert(loadstring(source, "@Data/Weights.lua"))("DaylightGear", NS)
+assert(loadstring(source, "@Data/Weights.lua"))("GloweyGear", NS)
 
 local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 local function trees(a, b, c) return { { name = "One", spent = a }, { name = "Two", spent = b }, { name = "Three", spent = c } } end

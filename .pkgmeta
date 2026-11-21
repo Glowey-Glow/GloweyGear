@@ -1,4 +1,4 @@
-package-as: DaylightGear
+package-as: GloweyGear
 
 # Kept in the repo, left out of the zip players download. LICENSE, CREDITS.md and AGENTS.md ship
 # with it (CREDITS.md carries the MIT notice for the wowsims-derived weights and must ship).

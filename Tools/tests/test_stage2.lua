@@ -44,8 +44,8 @@ local function character()
 	WORLD.class, WORLD.level = "WARRIOR", 60
 	WORLD.trees = { { name = "Arms", spent = 31 }, { name = "Fury", spent = 20 }, { name = "Protection", spent = 0 } }
 	WORLD.worn, WORLD.bags = {}, {}
-	w.settings.DaylightGear = {}
-	w.dui("SettingChanged", "DaylightGear", "enabled")
+	w.settings.GloweyGear = {}
+	w.dui("SettingChanged", "GloweyGear", "enabled")
 	w.dui("Login")
 end
 local function said() return w.chat[#w.chat] or "" end
@@ -226,11 +226,11 @@ end
 local function fresh()
 	T.reset()
 	character()
-	DaylightGearDB.overlap = nil
+	GloweyGearDB.overlap = nil
 	addons, modules = {}, {}
 	NS.Marks.shim = true
 	w.set("yieldBags", false); w.set("yieldTips", false); w.set("tooltips", true); w.set("bagMarks", true); w.set("enabled", true)
-	DaylightGearDB.overlap = nil
+	GloweyGearDB.overlap = nil
 	Overlap.Changed()
 end
 local function on(v) return v == nil or v == true end   -- Polestar's default is on
@@ -275,7 +275,7 @@ T.case("who else marks upgrades, and whose switch is flipped", function()
 	-- reversed: theirs
 	Overlap.Choose("tips", true)
 	T.eq(on(theirs["gear.tooltip"]), true, "theirs: Polestar's line is put back as it was")
-	T.eq(Overlap.Yields("tips"), true, "and ours stands down"); T.eq(w.settings.DaylightGear.yieldTips, true, "the setting follows")
+	T.eq(Overlap.Yields("tips"), true, "and ours stands down"); T.eq(w.settings.GloweyGear.yieldTips, true, "the setting follows")
 	w.set("yieldTips", false)
 	T.eq(theirs["gear.tooltip"], false, "the options page reverses it again")
 	-- a value the player had already switched off is not turned on when ours yields
@@ -322,7 +322,7 @@ T.case("M5: another addon's switch is taken only while ours really shows there",
 	-- Show Gear Advice off: everything is given back and nothing is asked
 	w.set("enabled", false)
 	T.eq(on(theirs["gear.tooltip"]), true, "Show Gear Advice off: given back")
-	DaylightGearDB.overlap.asked = {}
+	GloweyGearDB.overlap.asked = {}
 	T.eq(#Overlap.Unasked(), 0, "L10: with Gear Advice off no question is asked")
 	w.set("enabled", true)
 	-- bags: no mark of ours without Daylight UI's bags, so no overlap there
@@ -333,7 +333,7 @@ T.case("M5: another addon's switch is taken only while ours really shows there",
 	NS.Marks.shim = true
 	Overlap.Changed()
 	-- never in a fight
-	DaylightGearDB.overlap = nil
+	GloweyGearDB.overlap = nil
 	theirs["gear.tooltip"] = nil
 	Overlap.Changed()
 	local before = sets.n
@@ -595,7 +595,7 @@ T.case("the overlap window is built from Daylight UI's widgets and filled", func
 	T.eq(Overlap.Show(false), true, "there is something to ask: the window shows")
 	T.eq(made.switches, 2, "one switch per surface")
 	T.check(made.buttons[L["Apply"]] and made.buttons[L["Ask Me Later"]], "Apply and Ask Me Later")
-	local frame = rawget(_G, "DaylightGearOverlap") or w.frames_[#w.frames_]
+	local frame = rawget(_G, "GloweyGearOverlap") or w.frames_[#w.frames_]
 	T.check(frame ~= nil, "a frame was made")
 	-- Apply with the switches as they stand: both surfaces answered "ours"
 	made.buttons[L["Apply"]]:Click()
