@@ -215,11 +215,11 @@ T.case("gear that asks for a profession", function()
 	WORLD.professions = {}
 	Score.Fresh()
 	local later = rec({ id = 4385, equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = CLOTH, minLevel = 30 })
-	_, reason = Score.Usable(later, who("MAGE", 10))
+	reason = select(2, Score.Usable(later, who("MAGE", 10)))
 	T.eq(reason, "profession", "profession before level")
 	NS.ItemSkill[4390] = { 202, 150 }
 	local plate = rec({ id = 4390, equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = PLATE })
-	_, reason = Score.Usable(plate, who("MAGE", 60))
+	reason = select(2, Score.Usable(plate, who("MAGE", 60)))
 	T.eq(reason, "armor", "armor the class never wears stays that")
 	-- A record with no item number (the Auction House's first look) is not held back here.
 	T.eq(Score.Usable({ classID = 4, subclassID = CLOTH, equipLoc = "INVTYPE_HEAD", minLevel = 0 }, who("MAGE", 60)), true, "no id: later")
