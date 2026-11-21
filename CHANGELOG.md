@@ -1,5 +1,8 @@
 # Glowey's Gear (DaylightUI Plugin)
 
+## 1.0.2
+- Fixed: the plugin's icon on Daylight UI's options rail did not show in 1.0.1 (a wrong file path).
+
 ## 1.0.1
 - Glowey's Gear has its own icon: in the addon list, and on Daylight UI's options rail.
 
