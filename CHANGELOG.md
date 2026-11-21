@@ -27,4 +27,10 @@
 - `/gear debug` also reports how much time the plugin used in the last minute and what its list is doing.
 - **Prices stay true after the scan.** Whenever you look at an item in the Auction House, Upgrades for Sale learns what it costs now: a row moves to its new price, and an item that sold out drops off the list ("3 are no longer for sale."). Buying an auction yourself updates the row at once. A row's tooltip says when its price was last checked.
 - **Check Prices:** a button in the window that looks up every item shown, one at a time, through Daylight UI's Auction House (Stop ends it). Clicking a row checks that item too.
+- **Weapon pairs:** when a main hand and an off hand for sale are the better buy together (a one-hander and a shield against your two-hander, say), Upgrades for Sale shows them as one row, "Both Together", with the pair's gain and total price. It never suggests a pair you cannot hold.
+- **Hit cap:** hit you do not need is no longer counted. The cap is the game's own (8% melee and ranged and 17% spells against raid bosses at level 60; 5% and 4% against targets of your level while leveling), and your hit is added up from what you wear and your talents.
+- **Quest rewards:** when a quest lets you choose a reward, a chat line names the biggest upgrade for you, and that reward's tooltip says so too. Vendor Value Hint (off to start) names the reward that sells for the most when none is an upgrade.
+- **Chat Alert:** one quiet line when the Auction House has a better buy for a slot than last time. Never in a fight, never more than one a minute.
+- **Other gear addons:** if Polestar, Pawn, Forever Leveling BiS or CheapUpgrades also points out upgrades, Glowey's Gear asks once who does it on bags and on tooltips. Gear Advice by default; you can change it back any time under Other Addons in the options.
+- A unique-equipped weapon is no longer suggested beside a copy of itself you already hold.
 - Fixed: gear whose data arrived late during a Full scan could be left out of the list for good. Those listings are now read in the background while the Auction House stays open and join the list as they arrive.

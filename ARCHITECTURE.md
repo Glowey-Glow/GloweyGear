@@ -42,8 +42,11 @@ Load order is the `.toc`'s.
 | `Market.lua` | Gear for sale: reads the replicate list, saves it per house | 811 | `test_market.lua` |
 | `Check.lua` | What a search says since the scan: corrected prices, "none left", the player's purchases, Check Prices | 450 | `test_check.lua` |
 | `Window.lua` | Upgrades for Sale window, docking, controller, hand-off | 1121 | `test_window.lua` |
+| `Quest.lua` | Stage 2: the best reward of a quest with a choice, one chat line | 148 | `test_stage2.lua` |
+| `Alert.lua` | Stage 2: one chat line for a new best buy per slot | 95 | `test_stage2.lua` |
+| `Overlap.lua` | Stage 2: other gear addons, one question per surface, Polestar hand-over | 368 | `test_stage2.lua` |
 
-`Tools\tests\` (runner, mocks, twelve test files, `fixtures\`), `Tools\locales.py`, `Tools\client_facts.py`, `Tools\data\`, `design\`, `ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`, `CURSEFORGE.md` and `Data\README.md` stay out of the release zip (`.pkgmeta`). `LICENSE`, `CREDITS.md` and `AGENTS.md` ship.
+`Tools\tests\` (runner, mocks, thirteen test files, `fixtures\`), `Tools\locales.py`, `Tools\client_facts.py`, `Tools\data\`, `design\`, `ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`, `CURSEFORGE.md` and `Data\README.md` stay out of the release zip (`.pkgmeta`). `LICENSE`, `CREDITS.md` and `AGENTS.md` ship.
 
 ## 3. Public functions
 
@@ -229,6 +232,16 @@ The one frame of up to 7 ms in the first row comes and goes between runs of the 
 - **Frames:** market 1.8 ms, scoring 0.3 ms; paint 4.5 ms and price checks 4.3 ms while corrections streamed in. Since then: corrections repaint once a second at most; result sets are read by one worker at 2 ms a frame; a corrected key only marks its slot (`Live:Touch`) and the slot is made again once, when the view is next asked for.
 - **Check Prices:** 12 sent, 12 answered, 1 counted as failed with no cause kept. Failures are now counted by cause (`timeout`, `uncached`, `error`, `closed`, `ruleset`, `refused`, `no answer`).
 
+## 6b. Stage 2
+
+The design note is `design\stage2.md`: weapon pairs across the Auction House (`Rank.Set`), the hit cap (`Compare.lua`'s header; the part of hit not on gear is read from the game out of a fight and kept per character), quest rewards (`Quest.lua`), the chat alert (`Alert.lua`) and the overlap choice (`Overlap.lua`). Load order: `Window.lua`, `Quest.lua`, `Alert.lua`, `Overlap.lua`.
+
+New in the saved variables: `chars[guid].hit = { melee, spell }` (hit not from gear, percent), `chars[guid].seen = { house, spec, mode, slots = { [group] = { key, measure } } }` (the alert's memory), `overlap = { asked = { ["Addon:surface"] = true }, took = { ["Addon:surface"] = <its value before> } }`. New settings: `questPick`, `questSell`, `alert`, `yieldBags`, `yieldTips`.
+
+New adapters, each guarded: `Polestar.Get` / `Polestar.Set` (`Overlap.lua`; fall-back: treated as an addon with no switch), `GetHitModifier` and its two siblings (`Game.HitModifiers`; fall-back: gear hit only), the quest reward calls (`Game.QuestChoices`; fall-back: no line).
+
+Performance, measured with the benchmark after stage 2: 0 frames over 4.5 ms in every scenario (the scan read with the window up: worst frame 4.5 ms, median 3.1). Two things were found and fixed on the way: the list's index was built in the frame that saved the list (7.9 ms for 15,620 items; now made in slices of 2 ms when first asked for), and the tail's 1.5 ms could fall in the same frame as the window's 3 ms (the tail now waits while the window is scoring).
+
 ## 7. The three surfaces, as built
 
 ### 7.1 `Market.lua`
@@ -293,6 +306,7 @@ An item with a count above 0 is marked: the tooltip gets one more line, "Gear Ad
 ## 11. Limits of stage 1
 
 - **Effects that are not stats** (Use, proc and some Equip effects), set bonuses, enchants and gems are not counted. Items with such an effect are marked (section 9); how much the effect is worth is not known.
+- (Stage 2 built: weapon pairs, the hit cap, quest rewards, a chat alert, the overlap choice. The list below is stage 1's, kept for the record.)
 - **Weapon pairs across the Auction House:** a main hand and an off hand that are only an upgrade when bought together are not found. (A one-hand weapon is tried in both hands for a dual wielder; shields and held items against the off hand.)
 - **Weapon speed** (no language-free source), **hit cap**, **talents**.
 - **Class-restricted and profession-only gear** can be suggested wrongly (no table ships; `C_PlayerInfo.CanUseItem` is a game check). The class table of who can train which weapon and armor type is written by hand (single source).

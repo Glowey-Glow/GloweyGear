@@ -14,6 +14,7 @@ A plugin for Daylight UI, by Glowey (not part of Daylight UI itself: report its 
 - **No scan of its own:** it reads the auctions Daylight UI's **Full scan** fetched, and keeps the gear list for each Auction House, so the window also works away from it.
 - **Click an item** (or press A on a controller) to search it on the Buy page of Daylight UI's Auction House. **It never buys anything for you.**
 - **Prices stay true after the scan.** Whenever you look at an item in the Auction House, its row gets the current price, and items that sold out drop off the list. **Check Prices** looks up everything shown, one item at a time.
+- **Weapon pairs:** a main hand and an off hand that are the better buy together get one row, priced as a set.
 - **Docked** flush against Daylight UI's Auction House window while that is open, with a fold tab; on its own anywhere else. Open it with `/gear`.
 
 ### Item tooltips
@@ -27,6 +28,9 @@ A plugin for Daylight UI, by Glowey (not part of Daylight UI itself: report its 
 - **Found from your talents:** the tree with the most points. Before your first talent point a Leveling profile is used. Or pick a spec yourself.
 - **Upgrades are measured against the best you own** for that slot, worn or in your bags, so it never suggests buying something worse than what you already carry.
 - **Smallest Gain to Show** (3% to start) leaves out upgrades too small to care about; **Only My Best Armor Type** leaves out armor lighter than the heaviest your class wears.
+- **Hit you do not need is not counted:** the game's own hit caps, with your hit added up from your gear and talents.
+- **Quest rewards:** when a quest gives a choice, a chat line names the best reward for you.
+- **Chat Alert:** one quiet line when the Auction House has a better buy for a slot than last time.
 
 ---
 
@@ -46,12 +50,14 @@ Stat weights are **a starting point, not a final answer**, and can be wrong for 
 
 ## What this first version does not do
 
-- **Weapon pairs bought together:** a main hand and an off hand that are only an upgrade as a pair are not found. (A one-hand weapon is tried in both hands if you can dual wield.)
 - **Weapon speed** counts for nothing yet.
-- **Hit cap, talents, procs, Use effects, some Equip effects, set bonuses, enchants and gems** are not counted: an item is the sum of its plain stats. An item with an effect that is not counted says so on its tooltip, and has a * in the list.
+- **Talents, procs, Use effects, some Equip effects, set bonuses, enchants and gems** are not counted: an item is the sum of its plain stats. An item with an effect that is not counted says so on its tooltip, and has a * in the list.
 - **Class-restricted and profession-only gear** can be suggested wrongly.
 - **Your bank and your other characters** do not count as owned: only what you wear and carry.
-- No custom stat weights, no second spec to follow, no quest reward advice, no chat alerts.
+- No custom stat weights, no second spec to follow.
+- **No mark on quest reward tiles:** the best reward is named in chat and on its tooltip.
+- **The chat alert** speaks when the list is scored, which is while the Upgrades for Sale window is up.
+- **Other gear addons:** only Polestar's own marks can be switched off for you. With Pawn, Forever Leveling BiS or CheapUpgrades, both show unless you switch theirs off in their options.
 - Shown next to another gear addon's advice, the two can disagree: they use different weights.
 
 ---
