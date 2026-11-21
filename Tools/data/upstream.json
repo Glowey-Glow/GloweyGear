@@ -1,0 +1,408 @@
+{
+ "ui/specs/druid/balance/presets.ts#P1EpWeights": {
+  "label": "P1",
+  "stats": {
+   "StatArcaneDamage": 0.68,
+   "StatCritRating": 0.76,
+   "StatHasteRating": 0.99,
+   "StatHitRating": 1.48,
+   "StatIntellect": 0.28,
+   "StatMP5": 0.15,
+   "StatNatureDamage": 0.32,
+   "StatSpellDamage": 1.0,
+   "StatSpirit": 0.0
+  }
+ },
+ "ui/specs/druid/balance/presets.ts#PreBiSEpWeights": {
+  "label": "Pre-BiS",
+  "stats": {
+   "StatArcaneDamage": 0.68,
+   "StatCritRating": 0.76,
+   "StatHasteRating": 0.95,
+   "StatHitRating": 1.45,
+   "StatIntellect": 0.2,
+   "StatMP5": 0.0,
+   "StatNatureDamage": 0.32,
+   "StatSpellDamage": 1.0,
+   "StatSpirit": 0.0
+  }
+ },
+ "ui/specs/druid/feral_ep.ts#BearEp": {
+  "label": null,
+  "stats": {
+   "PseudoStatFeralCombatSkill": 2.5478378284939915,
+   "PseudoStatMainHandDps": 3.0930521753757847,
+   "StatAgility": 0.4334793978220709,
+   "StatArmor": 0.1743755390508764,
+   "StatArmorNoMods": 0.03691185978147275,
+   "StatArmorPenetration": 0.08262889794633035,
+   "StatAttackPower": 0.22093229824112756,
+   "StatBonusArmor": 0.17437553905087635,
+   "StatCritRating": 0.36326222397559405,
+   "StatDefenseRating": 0.8758307060275772,
+   "StatDodgeRating": 0.10739498989242388,
+   "StatExpertiseRating": 1.775973949024296,
+   "StatFeralAttackPower": 0.22093229824112756,
+   "StatHasteRating": 0.3581301339921136,
+   "StatHealth": 0.07717112351322317,
+   "StatHitRating": 0.6879449708049289,
+   "StatPhysicalDamage": 1.3666857276700761,
+   "StatStamina": 1.0028749432917183,
+   "StatStrength": 0.4860504938346992
+  }
+ },
+ "ui/specs/druid/feral_ep.ts#CatEp": {
+  "label": null,
+  "stats": {
+   "PseudoStatFeralCombatSkill": 5.326180320036634,
+   "PseudoStatMainHandDps": 2.142010195278739,
+   "StatAgility": 0.6546615973907315,
+   "StatArmorPenetration": 0.07421506952196227,
+   "StatAttackPower": 0.24378941350988748,
+   "StatCritRating": 0.5057159311903373,
+   "StatExpertiseRating": 0.49040516114181354,
+   "StatFeralAttackPower": 0.24313926679561954,
+   "StatHasteRating": 0.39306887257711326,
+   "StatHitRating": 0.5211576370723761,
+   "StatPhysicalDamage": 1.8630615922745424,
+   "StatStrength": 0.5942180657086884
+  }
+ },
+ "ui/specs/hunter/dps/presets.ts#MeleeEpWeights": {
+  "label": "Melee",
+  "stats": {
+   "PseudoStatMainHandDps": 4.53,
+   "PseudoStatOffHandDps": 1.19,
+   "PseudoStatRangedDps": 0.27,
+   "StatAgility": 1.0,
+   "StatAttackPower": 0.37,
+   "StatCritRating": 0.98,
+   "StatHasteRating": 0.96,
+   "StatHitRating": 2.41,
+   "StatIntellect": 0.7,
+   "StatMP5": 0.28,
+   "StatRangedAttackPower": 0.15,
+   "StatStrength": 0.4
+  }
+ },
+ "ui/specs/hunter/dps/presets.ts#TurretEpWeights": {
+  "label": "Turret",
+  "stats": {
+   "PseudoStatRangedDps": 2.87,
+   "StatAgility": 1.0,
+   "StatCritRating": 0.84,
+   "StatHasteRating": 0.8,
+   "StatHitRating": 1.14,
+   "StatIntellect": 0.38,
+   "StatMP5": 0.04,
+   "StatRangedAttackPower": 0.34
+  }
+ },
+ "ui/specs/hunter/dps/presets.ts#WeaveEpWeights": {
+  "label": "Weave",
+  "stats": {
+   "PseudoStatMainHandDps": 2.75,
+   "PseudoStatRangedDps": 1.72,
+   "StatAgility": 1.0,
+   "StatAttackPower": 0.19,
+   "StatCritRating": 0.8,
+   "StatHasteRating": 0.51,
+   "StatHitRating": 1.35,
+   "StatIntellect": 0.43,
+   "StatMP5": 0.07,
+   "StatRangedAttackPower": 0.2,
+   "StatStrength": 0.21
+  }
+ },
+ "ui/specs/paladin/retribution/presets.ts#HolyShockEpWeights": {
+  "label": "Holy Shock",
+  "stats": {
+   "PseudoStatMainHandDps": 13.04,
+   "PseudoStatSchoolHitPercentHoly": 23.2,
+   "StatAgility": 3.11,
+   "StatArmorPenetration": 0.26,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 4.66,
+   "StatExpertiseRating": 6.2,
+   "StatHasteRating": 4.06,
+   "StatHitRating": 10.25,
+   "StatHolyDamage": 4.98,
+   "StatIntellect": 4.53,
+   "StatMP5": 0.01,
+   "StatSpellDamage": 5.78,
+   "StatSpellPiercing": 0.01,
+   "StatStrength": 2.5
+  }
+ },
+ "ui/specs/paladin/retribution/presets.ts#UnsealedWrathEpWeights": {
+  "label": "Unsealed Wrath",
+  "stats": {
+   "PseudoStatMainHandDps": 13.85,
+   "PseudoStatSchoolHitPercentHoly": 6.0,
+   "StatAgility": 2.23,
+   "StatArmorPenetration": 0.24,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 3.08,
+   "StatExpertiseRating": 5.1,
+   "StatHasteRating": 22.87,
+   "StatHitRating": 6.83,
+   "StatHolyDamage": 1.95,
+   "StatIntellect": 2.06,
+   "StatMP5": 0.23,
+   "StatSpellDamage": 2.36,
+   "StatSpellPiercing": 0.01,
+   "StatStrength": 2.4
+  }
+ },
+ "ui/specs/priest/dps/presets.ts#ShadowEpWeights": {
+  "label": "Shadow",
+  "stats": {
+   "StatCritRating": 0.84,
+   "StatHasteRating": 0.73,
+   "StatHitRating": 1.14,
+   "StatIntellect": 0.24,
+   "StatShadowDamage": 1.0,
+   "StatSpellDamage": 1.0,
+   "StatSpirit": 0.01
+  }
+ },
+ "ui/specs/priest/dps/presets.ts#SmiteEpWeights": {
+  "label": "Smite",
+  "stats": {
+   "StatCritRating": 0.32,
+   "StatHasteRating": 0.43,
+   "StatHitRating": 0.37,
+   "StatHolyDamage": 0.81,
+   "StatIntellect": 0.58,
+   "StatMP5": 1.46,
+   "StatShadowDamage": 0.19,
+   "StatSpellDamage": 1.0,
+   "StatSpirit": 0.57
+  }
+ },
+ "ui/specs/priest/healer/presets.ts#DiscRaidHealingEpWeights": {
+  "label": "Disc Raid Healing",
+  "stats": {
+   "StatCritRating": 0.48,
+   "StatHasteRating": 0.1,
+   "StatHealingPower": 1.0,
+   "StatIntellect": 0.2,
+   "StatMP5": 0.19,
+   "StatSpirit": 0.1
+  }
+ },
+ "ui/specs/priest/healer/presets.ts#DiscSingleTargetEpWeights": {
+  "label": "Disc Single-Target",
+  "stats": {
+   "StatCritRating": 0.7,
+   "StatHasteRating": 0.15,
+   "StatHealingPower": 1.0,
+   "StatIntellect": 0.2,
+   "StatMP5": 0.4,
+   "StatSpirit": 0.15
+  }
+ },
+ "ui/specs/priest/healer/presets.ts#HolyRaidHealingEpWeights": {
+  "label": "Holy Raid Healing",
+  "stats": {
+   "StatCritRating": 0.23,
+   "StatHasteRating": 0.48,
+   "StatHealingPower": 1.0,
+   "StatIntellect": 0.3,
+   "StatMP5": 0.6,
+   "StatSpirit": 0.25
+  }
+ },
+ "ui/specs/priest/healer/presets.ts#HolySingleTargetEpWeights": {
+  "label": "Holy Single-Target",
+  "stats": {
+   "StatCritRating": 0.3,
+   "StatHasteRating": 0.5,
+   "StatHealingPower": 1.0,
+   "StatIntellect": 0.35,
+   "StatMP5": 0.6,
+   "StatSpirit": 0.3
+  }
+ },
+ "ui/specs/rogue/dps/presets.ts#EP_PRESET_ASSASSINATION": {
+  "label": "Assassination",
+  "stats": {
+   "PseudoStatMainHandDps": 8.44,
+   "PseudoStatOffHandDps": 4.16,
+   "StatAgility": 2.06,
+   "StatArmorPenetration": 0.4,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 2.02,
+   "StatExpertiseRating": 2.77,
+   "StatHasteRating": 1.93,
+   "StatHitRating": 2.8,
+   "StatPhysicalDamage": 10.55,
+   "StatSpellPiercing": 0.65,
+   "StatStamina": 0.01,
+   "StatStrength": 1.1
+  }
+ },
+ "ui/specs/rogue/dps/presets.ts#EP_PRESET_COMBAT_DAGS": {
+  "label": "Combat Daggers",
+  "stats": {
+   "PseudoStatMainHandDps": 10.18,
+   "PseudoStatOffHandDps": 2.97,
+   "StatAgility": 1.95,
+   "StatArmorPenetration": 0.43,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 1.68,
+   "StatExpertiseRating": 2.21,
+   "StatHasteRating": 1.7,
+   "StatHitRating": 2.35,
+   "StatPhysicalDamage": 9.9,
+   "StatSpellPiercing": 0.21,
+   "StatStamina": 0.01,
+   "StatStrength": 1.1
+  }
+ },
+ "ui/specs/rogue/dps/presets.ts#EP_PRESET_COMBAT_SINISTER": {
+  "label": "Combat Sinister",
+  "stats": {
+   "PseudoStatMainHandDps": 10.57,
+   "PseudoStatOffHandDps": 2.93,
+   "StatAgility": 1.96,
+   "StatArmorPenetration": 0.41,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 1.7,
+   "StatExpertiseRating": 2.55,
+   "StatHasteRating": 1.72,
+   "StatHitRating": 2.42,
+   "StatPhysicalDamage": 7.97,
+   "StatSpellPiercing": 0.19,
+   "StatStamina": 0.01,
+   "StatStrength": 1.1
+  }
+ },
+ "ui/specs/rogue/dps/presets.ts#EP_PRESET_SUBTLETY": {
+  "label": "Subtlety",
+  "stats": {
+   "PseudoStatMainHandDps": 10.47,
+   "PseudoStatOffHandDps": 2.27,
+   "StatAgility": 1.93,
+   "StatArmorPenetration": 0.33,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 1.63,
+   "StatExpertiseRating": 2.42,
+   "StatHasteRating": 1.43,
+   "StatHitRating": 2.12,
+   "StatPhysicalDamage": 6.83,
+   "StatSpellPiercing": 0.16,
+   "StatStamina": 0.01,
+   "StatStrength": 1.1
+  }
+ },
+ "ui/specs/shaman/elemental/presets.ts#DefaultEpWeights": {
+  "label": "Default",
+  "stats": {
+   "StatCritRating": 0.61,
+   "StatFireDamage": 0.31,
+   "StatHasteRating": 1.23,
+   "StatHitRating": 1.18,
+   "StatIntellect": 0.19,
+   "StatMP5": 0.04,
+   "StatNatureDamage": 0.69,
+   "StatSpellDamage": 1.0,
+   "StatSpellPiercing": 1.81,
+   "StatSpirit": 0.02
+  }
+ },
+ "ui/specs/shaman/enhancement/presets.ts#PreBiSEpWeights": {
+  "label": "Pre-BiS",
+  "stats": {
+   "PseudoStatMainHandDps": 14.18,
+   "StatAgility": 1.32,
+   "StatArmorPenetration": 0.37,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 2.42,
+   "StatExpertiseRating": 3.5,
+   "StatHasteRating": 2.81,
+   "StatHitRating": 5.2,
+   "StatIntellect": 1.99,
+   "StatNatureDamage": 0.72,
+   "StatSpellDamage": 1.27,
+   "StatSpellPiercing": 2.52,
+   "StatStrength": 2.2
+  }
+ },
+ "ui/specs/warrior/dps/presets.ts#PreBiSArmsEpWeights": {
+  "label": "Pre-BiS - Arms",
+  "stats": {
+   "PseudoStatMainHandDps": 16.63,
+   "PseudoStatOffHandDps": 0.0,
+   "StatAgility": 1.71,
+   "StatArmorPenetration": 0.45,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 2.23,
+   "StatExpertiseRating": 1.46,
+   "StatHasteRating": 1.19,
+   "StatHitRating": 4.7,
+   "StatStrength": 2.2
+  }
+ },
+ "ui/specs/warrior/dps/presets.ts#PreBiSFuryEpWeights": {
+  "label": "Pre-BiS - Fury",
+  "stats": {
+   "PseudoStatMainHandDps": 12.59,
+   "PseudoStatOffHandDps": 2.66,
+   "StatAgility": 1.7,
+   "StatArmorPenetration": 0.39,
+   "StatAttackPower": 1.0,
+   "StatCritRating": 2.26,
+   "StatExpertiseRating": 2.35,
+   "StatHasteRating": 1.76,
+   "StatHitRating": 1.69,
+   "StatStrength": 2.2
+  }
+ },
+ "ui/specs/warrior/protection/presets.ts#PreBiSBalancedEpWeights": {
+  "label": "Pre-BiS - Balanced",
+  "stats": {
+   "PseudoStatMainHandDps": 1.42,
+   "StatAgility": 0.66,
+   "StatArmor": 0.06,
+   "StatArmorNoMods": 0.06,
+   "StatArmorPenetration": 0.11,
+   "StatAttackPower": 0.27,
+   "StatBlockRating": 0.0,
+   "StatBlockValue": 0.76,
+   "StatBonusArmor": 0.06,
+   "StatCritRating": 0.43,
+   "StatDefenseRating": 0.53,
+   "StatDodgeRating": 0.29,
+   "StatExpertiseRating": 2.35,
+   "StatHasteRating": 0.17,
+   "StatHitRating": 0.04,
+   "StatParryRating": 0.26,
+   "StatStamina": 1.15,
+   "StatStrength": 0.62
+  }
+ },
+ "ui/specs/warrior/protection/presets.ts#PreBiSOffensiveEpWeights": {
+  "label": "Pre-BiS - Offensive",
+  "stats": {
+   "PseudoStatMainHandDps": 1.45,
+   "StatAgility": 0.56,
+   "StatArmor": 0.05,
+   "StatArmorNoMods": 0.05,
+   "StatArmorPenetration": 0.12,
+   "StatAttackPower": 0.27,
+   "StatBlockRating": 0.0,
+   "StatBlockValue": 0.63,
+   "StatBonusArmor": 0.05,
+   "StatCritRating": 0.43,
+   "StatDefenseRating": 0.45,
+   "StatDodgeRating": 0.23,
+   "StatExpertiseRating": 3.07,
+   "StatHasteRating": 0.29,
+   "StatHitRating": 0.06,
+   "StatParryRating": 0.22,
+   "StatStamina": 1.15,
+   "StatStrength": 0.62
+  }
+ }
+}

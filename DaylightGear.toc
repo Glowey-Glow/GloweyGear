@@ -1,0 +1,32 @@
+## Interface: 16001
+## Title: Glowey's |cff5fd38dGear|r (DaylightUI Plugin)
+## Notes: A plugin for Daylight UI: scores gear for your spec, compares it with what you wear and carry, and lists the best upgrades for sale on the Auction House by improvement per gold. The same verdict shows on item tooltips and bag slots.
+## Author: Glowey
+## X-License: All Rights Reserved
+## X-Credits: Some stat weights are derived from wowsims (MIT, Copyright (c) 2022 wowsims team): see CREDITS.md.
+## Version: @project-version@
+## Dependencies: DaylightUI
+## SavedVariables: DaylightGearDB
+
+Locales\Locales.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Locales\esES.lua
+Locales\ruRU.lua
+Locales\koKR.lua
+Locales\zhCN.lua
+Data\Weights.lua
+Game.lua
+Stats.lua
+Spec.lua
+Score.lua
+Compare.lua
+Rank.lua
+Update.lua
+Guide.lua
+GearGuide.lua
+Core.lua
+Marks.lua
+Market.lua
+Check.lua
+Window.lua

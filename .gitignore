@@ -1,0 +1,4 @@
+.release/
+.env
+*.zip
+__pycache__/

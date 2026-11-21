@@ -1,0 +1,21 @@
+package-as: DaylightGear
+
+# Kept in the repo, left out of the zip players download. LICENSE, CREDITS.md and AGENTS.md ship
+# with it (CREDITS.md carries the MIT notice for the wowsims-derived weights and must ship).
+ignore:
+  - README.md
+  - CHANGELOG.md
+  - CURSEFORGE.md
+  - ARCHITECTURE.md
+  - design
+  - Tools
+  - Data/README.md
+  - .github
+  - .gitignore
+  - .gitattributes
+  - .pkgmeta
+  - .luacheckrc
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown

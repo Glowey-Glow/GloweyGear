@@ -1,0 +1,34 @@
+# The client's combat ratings table (Tools/client_facts.py): 123 level rows, levels 1 to 123.
+# column<TAB>every value the column holds over all levels
+Unused 0	1
+Defense Skill	1
+Dodge	12
+Parry	15
+Block	5
+Hit - Melee	10
+Hit - Ranged	10
+Hit - Spell	10
+Crit - Melee	14
+Crit - Ranged	14
+Crit - Spell	14
+Corruption	10
+Corruption Resistance	10
+Speed	10
+Resilience - Crit Taken	10
+Resilience - Player Damage	10
+Lifesteal	10
+Haste - Melee	10
+Haste - Ranged	10
+Haste - Spell	10
+Avoidance	10
+Sturdiness	10
+Unused 7	0
+Expertise	10
+Armor Penetration	10
+Mastery	10
+PvP Power	10
+Unused 27	0
+Versatility - Damage Done	10
+Versatility - Healing Done	10
+Versatility - Damage Taken	10
+Unused 12	10

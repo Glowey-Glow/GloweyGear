@@ -1,0 +1,73 @@
+# Glowey's Gear (DaylightUI Plugin)
+
+**Gear advice for Daylight UI on WoW: Forever. It scores gear for your spec, tells you what is an upgrade over what you wear and carry, and lists the best upgrades for sale on the Auction House by improvement per gold.**
+
+A plugin for Daylight UI, by Glowey (not part of Daylight UI itself: report its bugs here, not to Daylight UI). Requires **Daylight UI**. It is not affiliated with any other gear addon, and uses none of their code, data or scales.
+
+---
+
+## What's in it
+
+### Upgrades for Sale
+- **The best upgrade on the Auction House for every gear slot**, with its price and how much better it is than what you own ("+12%", "Far Better" when a percent would be meaningless, or "Empty Slot" when you have nothing there). Select a slot to see up to ten alternatives.
+- **Most per Gold or Biggest Gain:** rank by the most improvement for each gold spent, or by the biggest improvement within your max price. **Max Price per Item** keeps it within what you want to spend.
+- **No scan of its own:** it reads the auctions Daylight UI's **Full scan** fetched, and keeps the gear list for each Auction House, so the window also works away from it.
+- **Click an item** (or press A on a controller) to search it on the Buy page of Daylight UI's Auction House. **It never buys anything for you.**
+- **Prices stay true after the scan.** Whenever you look at an item in the Auction House, its row gets the current price, and items that sold out drop off the list. **Check Prices** looks up everything shown, one item at a time.
+- **Docked** flush against Daylight UI's Auction House window while that is open, with a fold tab; on its own anywhere else. Open it with `/gear`.
+
+### Item tooltips
+- **One Gear Advice row** on gear tooltips, in both of Daylight UI's tooltip looks: "+12% over your Chest", "No better than your Chest", "Fills your empty Finger slot" or "Wearable at level 40". If you dual wield, a one-hand weapon is judged for the hand it helps most ("+8% over your Off Hand").
+- Gear your class can't wear gets no row, and neither does what you already have on.
+
+### Bag slots
+- **A green plus** in a corner of bag and bank slots that hold an upgrade, on Daylight UI's bags. **Bag Corner** moves it to the corner you like.
+
+### Your spec
+- **Found from your talents:** the tree with the most points. Before your first talent point a Leveling profile is used. Or pick a spec yourself.
+- **Upgrades are measured against the best you own** for that slot, worn or in your bags, so it never suggests buying something worse than what you already carry.
+- **Smallest Gain to Show** (3% to start) leaves out upgrades too small to care about; **Only My Best Armor Type** leaves out armor lighter than the heaviest your class wears.
+
+---
+
+## What it needs
+
+- **Daylight UI** 2.1 or later.
+- For the Upgrades for Sale list: **a Full scan in Daylight UI's Auction House**. Without Daylight UI's Auction House in use, the window has a scan button of its own (the game allows one about every 15 minutes).
+- For the bag mark: Daylight UI's bags.
+
+---
+
+## About the numbers
+
+Stat weights are **a starting point, not a final answer**, and can be wrong for your build. Level 60 weights for many specs are derived from the stat weight presets of the [WoWSims](https://wowsims.com) simulator for WoW: Forever ([github.com/wowsims/forever](https://github.com/wowsims/forever), MIT License, Copyright (c) 2022 wowsims team; the notice ships in `CREDITS.md`). The rest, and all weights below level 60, are our own.
+
+---
+
+## What this first version does not do
+
+- **Weapon pairs bought together:** a main hand and an off hand that are only an upgrade as a pair are not found. (A one-hand weapon is tried in both hands if you can dual wield.)
+- **Weapon speed** counts for nothing yet.
+- **Hit cap, talents, procs, Use effects, some Equip effects, set bonuses, enchants and gems** are not counted: an item is the sum of its plain stats. An item with an effect that is not counted says so on its tooltip, and has a * in the list.
+- **Class-restricted and profession-only gear** can be suggested wrongly.
+- **Your bank and your other characters** do not count as owned: only what you wear and carry.
+- No custom stat weights, no second spec to follow, no quest reward advice, no chat alerts.
+- Shown next to another gear addon's advice, the two can disagree: they use different weights.
+
+---
+
+## In your language
+Glowey's Gear speaks German, French, Spanish, Russian, Korean and Simplified Chinese (machine drafts, corrections welcome; words the game already translates use the game's own wording).
+
+---
+
+## How to use it
+
+- **Settings:** Daylight UI options > **Plugins > Gear**.
+- **The list:** run a Full scan in Daylight UI's Auction House, then `/gear`.
+- **Controller:** the window, the welcome and the tour work with a controller.
+- **Help** on the settings page: **Retake Tour** and **What's New**.
+
+---
+
+*Copyright (c) 2026 Glowey. All rights reserved. Free to download and play with. Stat weights derived from WoWSims are used under the MIT License.*
