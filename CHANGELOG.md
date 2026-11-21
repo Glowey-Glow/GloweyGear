@@ -1,7 +1,7 @@
 # Glowey's Gear (DaylightUI Plugin)
 
-## Unreleased
-- First build, not released yet. Glowey's Gear scores gear for your spec and compares it with what you wear and carry.
+## 1.0.0
+- First release. Glowey's Gear scores gear for your spec and compares it with what you wear and carry.
 - Your spec is found from your talents (the tree with the most points); before your first talent point a Leveling profile is used. You can pick a spec yourself on the options page: Daylight UI options, Plugins, Gear.
 - Stat weights for every class and talent tree, with their own values for leveling that change smoothly as you level. They are starting values: level 60 weights for many specs are based on the WoWSims simulator, the rest are our own.
 - Options: Smallest Gain to Show, Only My Best Armor Type, Max Price per Item, and Best Pick (Most per Gold or Biggest Gain).
@@ -21,17 +21,12 @@
 - A percent is never inflated by a near-worthless item in the slot: it is measured against at least half a typical piece of your own gear, and beyond +200% it reads "Far better". A slot holding an item your spec gets nothing from is no longer called empty.
 - Your spec choice is kept per character even though the game no longer gives realm names.
 - `/gear debug` prints what the plugin knows (your spec and how it was found, stat names it does not know, what it read from the Auction House), for a bug report.
-- Fixed: lag with the Upgrades for Sale window up at a large Auction House. The window now looks only at gear your class and level can wear, takes a few milliseconds a frame at most while it works, repaints only when what it shows changed, and does nothing at all while it is closed or folded away. It no longer starts over whenever the game loads item data.
-- Fixed: about a third of the gear for sale at a large Auction House could be left out of the list ("item never loaded"). A listing is now read as soon as the game has its link. What still cannot be read is counted, and the window says how many ("12 items for sale could not be read.").
-- Fixed: Fire, Nature, Frost, Shadow and Arcane resistance on gear was not counted.
-- `/gear debug` also reports how much time the plugin used in the last minute and what its list is doing.
 - **Prices stay true after the scan.** Whenever you look at an item in the Auction House, Upgrades for Sale learns what it costs now: a row moves to its new price, and an item that sold out drops off the list ("3 are no longer for sale."). Buying an auction yourself updates the row at once. A row's tooltip says when its price was last checked.
 - **Check Prices:** a button in the window that looks up every item shown, one at a time, through Daylight UI's Auction House (Stop ends it). Clicking a row checks that item too.
 - **Weapon pairs:** when a main hand and an off hand for sale are the better buy together (a one-hander and a shield against your two-hander, say), Upgrades for Sale shows them as one row, "Both Together", with the pair's gain and total price. It never suggests a pair you cannot hold.
-- **Hit cap:** hit you do not need is no longer counted. The cap is the game's own (8% melee and ranged and 17% spells against raid bosses at level 60; 5% and 4% against targets of your level while leveling). Your hit is added up from the gear you wear and the hit the game reports beyond your gear (talents that raise melee, ranged or all spell hit; not enchants, set bonuses or talents for a single spell school). If you dual wield, hit past the cap still counts at half value up to 27% (24% while leveling), because it only helps normal swings.
+- **Hit cap:** hit you do not need is not counted. The cap is the game's own (8% melee and ranged and 17% spells against raid bosses at level 60; 5% and 4% against targets of your level while leveling). Your hit is added up from the gear you wear and the hit the game reports beyond your gear (talents that raise melee, ranged or all spell hit; not enchants, set bonuses or talents for a single spell school). If you dual wield, hit past the cap still counts at half value up to 27% (24% while leveling), because it only helps normal swings.
 - **Quest rewards:** when a quest lets you choose a reward, a chat line names the biggest upgrade for you (also when the rewards load a moment after the page; not again when you reopen the same page), and that reward's tooltip says so too. Vendor Value Hint (off to start) names the reward that sells for the most when none is an upgrade.
 - **Chat Alert:** one quiet line when the Auction House has a better buy for a slot than last time. Never in a fight, never more than one a minute.
 - **Other gear addons:** if Polestar, Pawn, Forever Leveling BiS or CheapUpgrades also points out upgrades where Gear Advice does, Glowey's Gear asks once who does it on bags and on tooltips. Gear Advice by default; you can change it back any time under Other Addons in the options. Another addon's own marks are only switched off while Gear Advice really shows in that place, and come back when it does not. An addon whose gear advice you have switched off yourself does not count: Gear Advice simply shows, and nothing is asked.
-- A unique-equipped weapon is no longer suggested beside a copy of itself you already hold.
-- A long Gear Advice verdict ("Needs a weapon skill you have not trained") goes on a line of its own under its label on the tooltip, so the label is no longer pushed out; short ones ("+12% over your Chest") stay beside it.
-- Fixed: gear whose data arrived late during a Full scan could be left out of the list for good. Those listings are now read in the background while the Auction House stays open and join the list as they arrive.
+- A unique-equipped weapon is never suggested beside a copy of itself you already hold.
+- A long Gear Advice verdict ("Needs a weapon skill you have not trained") goes on a line of its own under its label on the tooltip, so the label is never pushed out; short ones ("+12% over your Chest") stay beside it.
