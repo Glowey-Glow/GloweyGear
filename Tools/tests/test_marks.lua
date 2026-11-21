@@ -226,6 +226,10 @@ T.case("the words for every kind of verdict, in English", function()
 
 	text, color, kind = M.Advice({ group = "MAINHAND", usable = false, reason = "skill", atLevel = 1, gain = 1 }, 3)
 	T.eq(text, "Needs a weapon skill you have not trained", "an untrained weapon"); T.eq(color, C.wait, "waiting"); T.eq(kind, "skill", "kind")
+	text, color, kind = M.Advice({ group = "HEAD", usable = false, reason = "profession", atLevel = 1, gain = 1, needLine = 202, needRank = 150, needName = "Engineering" }, 3)
+	T.eq(text, "Needs Engineering (150)", "a profession's item"); T.eq(color, C.wait, "waiting"); T.eq(kind, "prof", "kind")
+	text = M.Advice({ group = "HEAD", usable = false, reason = "profession", atLevel = 1, gain = 1, needLine = 202, needRank = 150 }, 3)
+	T.eq(text, "Needs a profession skill you do not have", "with no name from the game")
 
 	for _, reason in ipairs({ "armor", "weapon", "tool", "lighter", "dualwield" }) do
 		T.eq(M.Advice(v({ usable = false, reason = reason }), 3), nil, "no row for: " .. reason)

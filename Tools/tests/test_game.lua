@@ -118,6 +118,33 @@ T.case("class, level, skills, spells, worn and carried", function()
 	T.eq(load().Level(), nil, "a level of 0 is 'not known yet'")
 end)
 
+T.case("a profession's skill", function()
+	-- luacheck: globals GetProfessions GetProfessionInfo C_SkillInfo C_TradeSkillUI
+	local old = { GetProfessions, GetProfessionInfo, C_SkillInfo, C_TradeSkillUI }
+	GetProfessions, GetProfessionInfo, C_SkillInfo, C_TradeSkillUI = nil, nil, nil, nil
+	T.eq(load().SkillRank(202), nil, "no call at all: cannot say")
+	-- The profession list, as the game's own book reads it: index -> name, icon, rank, max,
+	-- spells, offset, skill line, modifier. A slot with no profession is nil.
+	GetProfessions = function() return 5, nil, 9, nil, 7 end
+	GetProfessionInfo = function(index)
+		if index == 5 then return "Engineering", 1, 140, 150, 3, 0, 202, 15 end
+		if index == 9 then return "First Aid", 1, 75, 150, 3, 0, 129, 0 end
+		if index == 7 then return "Cooking", 1, 1, 75, 3, 0, 185, 0 end
+	end
+	local G = load()
+	T.eq(G.SkillRank(202), 155, "rank plus its modifier"); T.eq(G.SkillRank(129), 75, "a secondary one")
+	T.eq(G.SkillRank(197), false, "the list was read and it is not in it")
+	-- A line the list does not hold, asked of the skill info.
+	C_SkillInfo = { GetSkillLineInfoByID = function(line) if line == 182 then return { rank = 100, modifier = 0 } end end }
+	G = load()
+	T.eq(G.SkillRank(182), 100, "from the skill info"); T.eq(G.SkillRank(171), false, "not there either")
+	T.eq(G.SkillName(202), nil, "no name call")
+	C_TradeSkillUI = { GetTradeSkillDisplayName = function(line) return line == 202 and "Engineering" or "" end }
+	G = load()
+	T.eq(G.SkillName(202), "Engineering", "the game's name"); T.eq(G.SkillName(1), nil, "an empty name is none")
+	GetProfessions, GetProfessionInfo, C_SkillInfo, C_TradeSkillUI = old[1], old[2], old[3], old[4]
+end)
+
 T.case("a secret value is never used", function()
 	local SECRET = {}
 	issecretvalue = function(v) return v == SECRET end

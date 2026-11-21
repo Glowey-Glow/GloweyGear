@@ -14,7 +14,9 @@
 --                                   verdict on an item that is itself in the bags
 --               { wornOnly = true } compare with what is worn, ignoring the bags
 --        out  = { usable, reason, atLevel, group, slot, score, base, gain, pct, far, empty,
---                 replaces (a record or nil), twoHand, offHand }
+--                 replaces (a record or nil), twoHand, offHand,
+--                 needLine, needRank, needName (reason "profession": the skill line it asks
+--                 for, the rank, the profession's name or nil) }
 --   Compare.GROUPS                            -> the slot groups in display order
 --   Compare.FAR                               -> the percent above which "far" is set
 --
@@ -464,6 +466,13 @@ function Compare.Evaluate(rec, ctx, opts, out)
 	local usable, reason, atLevel = false, "armor", rec.minLevel or 0
 	if group then usable, reason, atLevel = Score.Usable(rec, ctx, ctx) end
 	out.usable, out.reason, out.atLevel = usable, reason, atLevel
+	-- (A profession the item asks for: which, how much, and its name when the game gives one.)
+	out.needLine, out.needRank, out.needName = nil, nil, nil
+	if reason == "profession" then
+		local line, rank = Score.NeedsProfession(rec.id)
+		out.needLine, out.needRank = line, rank
+		out.needName = line and ns.Game.SkillName and ns.Game.SkillName(line) or nil
+	end
 	if not group then return out end
 
 	local raw = Score.Value(rec.stats, ctx.weights)

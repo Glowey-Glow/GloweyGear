@@ -1,5 +1,10 @@
 # Glowey's Gear (DaylightUI Plugin)
 
+## 1.0.3
+- Gear that asks for a profession is no longer recommended to a character who lacks it. Engineering goggles, the fishing hats and poles, the blacksmith's and alchemist's trinkets and the like (72 items, from the game's own item table) are checked against your professions and your skill in them: one you can't equip is left out of the Auction House upgrades and gets no upgrade mark in your bags.
+- Its tooltip says why instead: "Needs Engineering (150)".
+- A profession's racial or worn skill bonus counts, as it does for the game.
+
 ## 1.0.2
 - Fixed: the plugin's icon on Daylight UI's options rail did not show in 1.0.1 (a wrong file path).
 

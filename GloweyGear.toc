@@ -18,6 +18,7 @@ Locales\ruRU.lua
 Locales\koKR.lua
 Locales\zhCN.lua
 Data\Weights.lua
+Data\Requirements.lua
 Game.lua
 Stats.lua
 Spec.lua

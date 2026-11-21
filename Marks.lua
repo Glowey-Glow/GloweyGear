@@ -2,7 +2,7 @@
 -- tooltips, and a small mark in a corner of bag and bank slots that hold an upgrade.
 --
 --   Marks.Kind(verdict, minGain)   -> "up" | "far" | "better" | "empty" | "small" | "same" |
---                                     "none" | "later" | "skill" | nil          (pure)
+--                                     "none" | "later" | "skill" | "prof" | nil (pure)
 --   Marks.Text(verdict, minGain)   -> "+12%" | "Far Better" | "Better" | "Empty Slot" | nil, color
 --                                     the short form: only for an upgrade (pure). The window's
 --                                     rows use it too, so the two never disagree.
@@ -29,6 +29,7 @@
 --   none    wearable, but it has no stat the spec's weights count     "No stats your spec uses"
 --   later   only the level is missing                                 "Wearable at level 40"
 --   skill   a weapon type the class can train and has not             "Needs a weapon skill ..."
+--   prof    a profession the item asks for and you lack (or too low)  "Needs Engineering (150)"
 --   nil     not gear, or gear the class cannot wear: no row at all.
 -- The bag mark shows for up, better and empty.
 --
@@ -78,7 +79,7 @@ local COLOR = {
 Marks.COLOR = COLOR
 -- kind -> the color's name in COLOR; a kind with none takes the tooltip's own value color.
 local COLOR_OF = { up = "good", far = "good", better = "good", empty = "good", same = "soft", none = "soft",
-	later = "wait", skill = "wait" }
+	later = "wait", skill = "wait", prof = "wait" }
 local MARKED = { up = true, far = true, better = true, empty = true }
 Marks.NOTE = L["Gear Advice does not count this item's special effect."]
 
@@ -118,6 +119,7 @@ function Marks.Kind(v, minGain)
 	if not v.usable then
 		if v.reason == "level" then return "later" end
 		if v.reason == "skill" then return "skill" end
+		if v.reason == "profession" then return "prof" end
 		return nil   -- armor or a weapon the class never wears, a tool, lighter armor than asked for
 	end
 	local gain = tonumber(v.gain) or 0
@@ -162,6 +164,13 @@ function Marks.Advice(v, minGain)
 		text = L["No stats your spec uses"]
 	elseif kind == "later" then
 		text = L["Wearable at level %d"]:format(tonumber(v.atLevel) or 0)
+	elseif kind == "prof" then
+		-- (The game's own way of saying it, "Requires Engineering (150)", in our words.)
+		if type(v.needName) == "string" and tonumber(v.needRank) then
+			text = L["Needs %s (%d)"]:format(v.needName, v.needRank)
+		else
+			text = L["Needs a profession skill you do not have"]
+		end
 	else
 		text = L["Needs a weapon skill you have not trained"]
 	end

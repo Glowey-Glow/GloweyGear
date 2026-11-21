@@ -14,6 +14,7 @@
 -- luacheck: read globals C_Item C_Traits C_SpecializationInfo C_SkillInfo C_SpellBook C_Container
 -- luacheck: read globals GetInventoryItemLink UnitClass UnitLevel InCombatLockdown debugprofilestop
 -- luacheck: read globals issecretvalue NUM_BAG_SLOTS IsSpellKnown C_TooltipInfo Enum UnitGUID
+-- luacheck: read globals GetProfessions GetProfessionInfo C_TradeSkillUI
 -- luacheck: read globals UnitName UnitFactionGroup GetRealmName GetRealmID GetTimePreciseSec GetTime
 
 local _, ns = ...
@@ -240,6 +241,53 @@ function Game.KnowsSkill(line)
 	local ok, info = pcall(f, line)
 	if not ok then return nil end
 	return type(info) == "table"
+end
+
+-- The character's skill in a profession (its skill line): a number, false when the character has
+-- not learned it, nil when the game cannot say. The profession list first: GetProfessions and
+-- GetProfessionInfo are what the client's own profession book reads (FX Blizzard_ProfessionsBook\
+-- Camelot\Blizzard_ProfessionsBook.lua:21, :55: rank the 3rd value, the skill line the 7th, the
+-- rank's modifier the 8th). A line that list does not hold (Herbalism is in it, a weapon skill is
+-- not) is asked of C_SkillInfo.GetSkillLineInfoByID (rank, modifier: DOC
+-- SkillInfoDocumentation.lua:113-132). The modifier (a racial or worn bonus) counts: the game
+-- shows a skill as rank plus modifier (FX Blizzard_UIPanels_Game\Camelot\PaperDollFrameStats.lua:
+-- 710-717), and an item's requirement is met by that value.
+function Game.SkillRank(line)
+	local listed = false
+	if GetProfessions and GetProfessionInfo then
+		local ok, a, b, c, d, e, f = pcall(GetProfessions)
+		if ok then
+			listed = true
+			for _, index in pairs({ a, b, c, d, e, f }) do
+				local fine, _, _, rank, _, _, _, skillLine, modifier = pcall(GetProfessionInfo, index)
+				if fine and Plain(skillLine) == line and type(Plain(rank)) == "number" then
+					modifier = Plain(modifier)
+					return rank + (type(modifier) == "number" and modifier or 0)
+				end
+			end
+		end
+	end
+	local f = C_SkillInfo and C_SkillInfo.GetSkillLineInfoByID
+	if f then
+		local ok, info = pcall(f, line)
+		if ok and type(info) == "table" then
+			local rank, modifier = Plain(info.rank), Plain(info.modifier)
+			if type(rank) == "number" then return rank + (type(modifier) == "number" and modifier or 0) end
+		end
+		if ok then return false end
+	end
+	if listed then return false end
+	return nil
+end
+
+-- A profession's name in the player's language by its skill line, or nil: the game's own
+-- (C_TradeSkillUI.GetTradeSkillDisplayName, DOC TradeSkillUIDocumentation.lua:882).
+function Game.SkillName(line)
+	local f = C_TradeSkillUI and C_TradeSkillUI.GetTradeSkillDisplayName
+	if not f then return nil end
+	local ok, name = pcall(f, line)
+	name = ok and Plain(name) or nil
+	return type(name) == "string" and name ~= "" and name or nil
 end
 
 -- Whether the character knows a spell (C_SpellBook.IsSpellKnown, DOC

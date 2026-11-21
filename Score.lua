@@ -101,7 +101,31 @@ local ANY_ARMOR = { INVTYPE_CLOAK = true, INVTYPE_NECK = true, INVTYPE_FINGER = 
 -- game shows none the answer is "cannot say" and the class table alone decides. Asked once per
 -- evaluation pass (Score.Fresh() starts a new one).
 local skills
-function Score.Fresh() skills = nil end
+local ranks = {}          -- profession skill line -> Game.SkillRank's answer (UNSAID for "cannot say")
+local UNSAID = -1
+function Score.Fresh()
+	skills = nil
+	for line in pairs(ranks) do ranks[line] = nil end
+end
+
+-- The profession skill an item asks for and the character lacks: line, rank needed, rank held
+-- (false: the profession is not learned); nothing when the item asks for none, the character has
+-- it, or the game cannot say what the character has (then the item is not held back). The items
+-- are the client's own list (Data/Requirements.lua: ns.ItemSkill, itemID -> { line, rank }).
+function Score.NeedsProfession(itemID)
+	local need = itemID and ns.ItemSkill and ns.ItemSkill[itemID]
+	if not need then return nil end
+	local line, rank = need[1], need[2] or 0
+	local have = ranks[line]
+	if have == nil then
+		have = ns.Game.SkillRank and ns.Game.SkillRank(line)
+		if have == nil then have = UNSAID end
+		ranks[line] = have
+	end
+	if have == UNSAID then return nil end
+	if have == false or have < rank then return line, rank, have end
+	return nil
+end
 
 local function knows(line)
 	if skills == nil then
@@ -158,6 +182,10 @@ function Score.Usable(rec, who, opts)
 		end
 		if SKILL[sub] and not knows(SKILL[sub]) then return false, "skill", atLevel end
 	end
+
+	-- A profession the item asks for (engineering goggles, a fishing hat): said before the level,
+	-- since a level comes by itself and a profession does not.
+	if Score.NeedsProfession(rec.id) then return false, "profession", atLevel end
 
 	if atLevel > level then return false, "level", atLevel end
 	return true, nil, atLevel

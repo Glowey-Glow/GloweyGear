@@ -133,6 +133,12 @@ function Game.KnowsSkill(line)
 	return WORLD.skills[line] == true
 end
 function Game.KnowsSpell(id) return WORLD.spells[id] == true end
+-- WORLD.professions: nil = the game cannot say; else skill line -> rank (absent: not learned).
+function Game.SkillRank(line)
+	if WORLD.professions == nil then return nil end
+	return WORLD.professions[line] or false
+end
+function Game.SkillName(line) return WORLD.professionNames and WORLD.professionNames[line] or nil end
 function Game.WornLink(slot) return WORLD.worn[slot] end
 function Game.BagLinks(out)
 	called("BagLinks")
@@ -254,6 +260,8 @@ function T.reset()
 	WORLD.guid, WORLD.name, WORLD.realm, WORLD.realmID, WORLD.faction = "Player-4407-00ABCDEF", "Tester", "Test Realm", nil, "Alliance"
 	WORLD.class, WORLD.level, WORLD.trees, WORLD.skills, WORLD.spells = "WARRIOR", 60, nil, nil, {}
 	WORLD.calls, WORLD.requested, WORLD.noCacheCall = {}, {}, nil
+	WORLD.professions, WORLD.professionNames = nil, nil
+	NS.ItemSkill = nil
 	if NS.Stats then
 		NS.Stats.Forget()
 		NS.Stats.unknown = {}

@@ -184,4 +184,45 @@ T.case("the weapon skill numbers are the client's own character sheet's", functi
 	T.eq(Score.CanDualWield(who("MAGE", 60)), true, "unless the spell is known")
 end)
 
+T.case("gear that asks for a profession", function()
+	T.reset()
+	-- (Engineering 202 at 150: green goggles. Data/Requirements.lua's shape.)
+	NS.ItemSkill = { [4385] = { 202, 150 } }
+	local goggles = rec({ id = 4385, equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = CLOTH })
+	local hat = rec({ id = 4386, equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = CLOTH })
+	-- The game cannot say what the character has: nothing is held back.
+	T.eq(Score.Usable(goggles, who("MAGE", 60)), true, "cannot say: usable")
+	-- No Engineering.
+	WORLD.professions = { [197] = 300 }
+	Score.Fresh()
+	local ok, reason = Score.Usable(goggles, who("MAGE", 60))
+	T.eq(ok, false, "not an engineer"); T.eq(reason, "profession", "the profession is why")
+	local line, rank, have = Score.NeedsProfession(4385)
+	T.eq(line, 202, "which line"); T.eq(rank, 150, "how much"); T.eq(have, false, "not learned")
+	T.eq(Score.Usable(hat, who("MAGE", 60)), true, "an item that asks for none")
+	-- Engineering, too low; then enough. (One pass keeps its answers: Fresh starts the next.)
+	WORLD.professions = { [202] = 149 }
+	T.eq(Score.Usable(goggles, who("MAGE", 60)), false, "the pass's answer is kept")
+	Score.Fresh()
+	ok, reason = Score.Usable(goggles, who("MAGE", 60))
+	T.eq(ok, false, "149 of 150"); T.eq(reason, "profession", "still the profession")
+	T.eq(select(3, Score.NeedsProfession(4385)), 149, "what is held")
+	WORLD.professions = { [202] = 150 }
+	Score.Fresh()
+	T.eq(Score.Usable(goggles, who("MAGE", 60)), true, "150 of 150")
+	T.eq(Score.NeedsProfession(4385), nil, "nothing lacking")
+	-- The profession is said before the level, and armor the class cannot wear before both.
+	WORLD.professions = {}
+	Score.Fresh()
+	local later = rec({ id = 4385, equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = CLOTH, minLevel = 30 })
+	_, reason = Score.Usable(later, who("MAGE", 10))
+	T.eq(reason, "profession", "profession before level")
+	NS.ItemSkill[4390] = { 202, 150 }
+	local plate = rec({ id = 4390, equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = PLATE })
+	_, reason = Score.Usable(plate, who("MAGE", 60))
+	T.eq(reason, "armor", "armor the class never wears stays that")
+	-- A record with no item number (the Auction House's first look) is not held back here.
+	T.eq(Score.Usable({ classID = 4, subclassID = CLOTH, equipLoc = "INVTYPE_HEAD", minLevel = 0 }, who("MAGE", 60)), true, "no id: later")
+end)
+
 return T.done()
