@@ -641,4 +641,61 @@ T.case("an effect the score leaves out is said on the tooltip, in words (the aud
 	T.eq(WORLD.calls.ItemEffects, calls, "the tooltip's lines are counted once and kept")
 end)
 
+T.case("a verdict too long for the card's row goes on a line of its own, under its label", function()
+	-- Daylight UI's Rich card for an item is 290 wide at most, 258 inside; a row keeps its value
+	-- whole and cuts the LABEL to what is left (DaylightUI_Tooltip\Rich\Panel.lua:34, :25,
+	-- :766-777). "Needs a weapon skill you have not trained" left no room for "Gear Advice".
+	local M = boot({ shim = "own" })
+	T.check(M.Fits("Gear Advice", "+12% over your Chest"), "a short verdict fits beside its label")
+	T.check(not M.Fits("Gear Advice", "Needs a weapon skill you have not trained"), "a long one does not")
+	T.check(M.Fits("x", "y", function() return 100 end), "measured widths are used when there are any: 100 + 100 fits")
+	T.check(not M.Fits("x", "y", function() return 130 end), "130 + 130 does not")
+	T.check(not M.Fits("장비 조언", "훈련하지 않은 무기 숙련이 필요합니다"), "wide characters count wide")
+	-- every verdict sentence in every language: whichever layout is chosen, nothing is cut
+	local longest = 0
+	for _, locale in ipairs({ "enUS", "deDE", "esES", "frFR", "koKR", "ruRU", "zhCN" }) do
+		local Ml = boot({ shim = "own", lang = locale })
+		local L = NS.L
+		local label = L["Gear Advice"]
+		for _, key in ipairs({ "+%s%% over your %s", "Far better than your %s", "Better than your %s", "Fills your empty %s slot",
+			"No better than your %s", "No stats your spec uses", "Wearable at level %d", "Needs a weapon skill you have not trained" }) do
+			local text = L[key]:gsub("%%s%%%%", "12%%%%"):gsub("%%s", "Main Hand"):gsub("%%d", "60"):gsub("%%%%", "%%")
+			local w = Ml.Width(label) + Ml.Width(text)
+			if Ml.Fits(label, text) then
+				T.check(w <= Ml.ROW_ROOM, locale .. ": a verdict kept in the row is within the row's room (" .. text .. ")")
+				longest = math.max(longest, w)
+			end
+		end
+	end
+	T.check(longest > 0, "some verdicts do stay in the row")
+	-- the two layouts, as the tooltip gets them
+	M = boot({ shim = "own" })
+	WORLD.class, WORLD.level = "WARRIOR", 60
+	WORLD.worn[1] = helm(10)
+	owned()
+	local function tip(link)
+		local rows, texts = {}, {}
+		tipLines[1].fn({
+			Row = function(label, value, color) rows[#rows + 1] = { label = label, value = value, color = color } end,
+			Text = function(text, color) texts[#texts + 1] = { text = text, color = color } end,
+		}, { link = link, itemID = 1, style = "rich" })
+		return rows, texts
+	end
+	local rows, texts = tip(helm(15))
+	T.eq(#rows, 1, "a short verdict: one row"); T.eq(rows[1].label, "Gear Advice", "label on the left")
+	T.eq(rows[1].value, "+50% over your Head", "value on the right"); T.eq(#texts, 0, "and no line besides")
+	-- a weapon for an empty hand: a sentence too long for the row
+	local sword = T.item({ equipLoc = "INVTYPE_WEAPON", classID = 2, subclassID = 7, raw = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 10 } })
+	rows, texts = tip(sword)
+	T.eq(#rows, 1, "a long verdict: the label has a row to itself"); T.eq(rows[1].label, "Gear Advice", "the label")
+	T.eq(rows[1].value, "", "with no value beside it")
+	T.eq(#texts, 1, "and the sentence on a line of its own, where it can wrap")
+	T.eq(texts[1] and texts[1].text, "Fills your empty Main Hand slot", "the whole sentence")
+	T.check(texts[1] and texts[1].color ~= nil, "in the verdict's color")
+	-- an older Daylight UI without lines.Text: the row as before, rather than nothing
+	local got = {}
+	tipLines[1].fn({ Row = function(label, value) got[#got + 1] = value end }, { link = sword, itemID = 1 })
+	T.eq(got[1], "Fills your empty Main Hand slot", "without lines.Text the row carries the sentence")
+end)
+
 return T.done()

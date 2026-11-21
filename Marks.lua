@@ -430,6 +430,67 @@ end
 -- label and its value in both looks, Rich and Simple, color = { r, g, b } (:1246-1255, :1267;
 -- API.md:747), lines.Text(text, color) a wrapped sentence (API.md:748), and a line already on
 -- the tooltip is not added twice (:1225-1230). Line numbers are Daylight UI 2.1.2's.
+-- ROW OR LINE. Daylight UI's Rich card for an item is at most 290 wide, 258 inside its padding
+-- (DUI:DaylightUI_Tooltip\Rich\Panel.lua:34, :25). A row keeps its VALUE whole at the right
+-- edge and cuts the LABEL to what is left, 16 px of gap taken off (:766-777): beside "Needs a
+-- weapon skill you have not trained" nothing of "Gear Advice" was left, as seen in play. A
+-- sentence (lines.Text) wraps to the card instead (Panel.lua:508-512; API.md:748). So:
+--   * label + verdict fit in the row's room: lines.Row(label, verdict), as before;
+--   * they do not: the label on a row of its own (no value), the verdict as a sentence under
+--     it, in the verdict's color. Nothing is cut in either case, in either look (Simple shows
+--     the same two pieces as two plain lines).
+-- Widths are measured with Daylight UI's own body text where it can be made (API.Text), else
+-- estimated per character (5.8 px for Latin, 7 for other alphabets, 12 for Chinese and Korean).
+Marks.ROW_ROOM = 236   -- 258 inside the card, less the 16 px gap, less a little for rounding
+
+local measurer, measured = nil, {}
+local function estimate(text)
+	local w = 0
+	for i = 1, #text do
+		local b = text:byte(i)
+		if b < 128 then
+			w = w + 5.8
+		elseif b >= 0xE3 and b < 0xF0 then
+			w = w + 12        -- (the first byte of a Chinese, Japanese or Korean character)
+		elseif b >= 0xC0 then
+			w = w + 7         -- (the first byte of any other character; the bytes after it count nothing)
+		end
+	end
+	return w
+end
+
+function Marks.Width(text)
+	text = tostring(text or "")
+	local known = measured[text]
+	if known then return known end
+	local w
+	local API = ns.API
+	if measurer == nil then
+		measurer = false
+		if API and type(API.Text) == "function" then
+			local ok, fs = pcall(API.Text, CreateFrame("Frame"), "body", "LEFT")
+			if ok and type(fs) == "table" and type(fs.GetStringWidth) == "function" then measurer = fs end
+		end
+	end
+	if measurer then
+		local ok, got = pcall(function()
+			measurer:SetText(text)
+			return measurer:GetStringWidth()
+		end)
+		if ok and type(got) == "number" and got > 0 then w = got end
+	end
+	w = w or estimate(text)
+	measured[text] = w
+	return w
+end
+
+-- Whether a label and its value fit side by side in the card's row. measure: a width
+-- function, for the tests.
+function Marks.Fits(label, value, measure)
+	measure = measure or Marks.Width
+	return measure(label) + measure(value) <= Marks.ROW_ROOM
+end
+
 local function OnItemTooltip(lines, data)
 	if ns.Get("enabled") == false or ns.Get("tooltips") == false then return end
 	if ns.Overlap and ns.Overlap.Yields("tips") then return end
@@ -442,7 +503,16 @@ local function OnItemTooltip(lines, data)
 	local entry = Lookup("tip", link)
 	if not entry then return end
 	local row = lines.Row or lines.Line   -- (Row is API 1.12; Line is the same piece since 1.7)
-	if type(row) == "function" then row(L["Gear Advice"], entry.text, entry.color) end
+	if type(row) == "function" then
+		local label = L["Gear Advice"]
+		if type(lines.Text) ~= "function" or Marks.Fits(label, entry.text) then
+			row(label, entry.text, entry.color)
+		else
+			-- (Too long for the row: the label alone, the verdict as a sentence under it.)
+			row(label, "")
+			lines.Text(entry.text, entry.color)
+		end
+	end
 	-- (lines.Text: a wrapped sentence in both looks, API.md's tooltip pieces table.)
 	if entry.note and type(lines.Text) == "function" then lines.Text(Marks.NOTE, COLOR.soft) end
 	-- (The reward Quest.lua picked, while its quest page is open.)
