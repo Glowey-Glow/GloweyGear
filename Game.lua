@@ -311,18 +311,22 @@ end
 -- GetNumQuestChoices, GetQuestItemLink(type, index), GetQuestItemInfo(type, index) -> name,
 -- texture, count, quality, usable, itemID: the game's own quest frame calls them so (FX
 -- Blizzard_UIPanels_Game\Mainline\QuestInfo.lua:526, :647; QuestFrame.lua:743).
-function Game.QuestChoices(out)
-	local num, link, info = rawget(_G, "GetNumQuestChoices"), rawget(_G, "GetQuestItemLink"), rawget(_G, "GetQuestItemInfo")
+-- kind = "reward": the rewards given without a choice instead (GetNumQuestRewards, the
+-- same two item calls with "reward": FX ...\Mainline\QuestInfo.lua:526, :546, :646).
+function Game.QuestChoices(out, kind)
+	kind = kind == "reward" and "reward" or "choice"
+	local num, link, info = rawget(_G, kind == "reward" and "GetNumQuestRewards" or "GetNumQuestChoices"),
+		rawget(_G, "GetQuestItemLink"), rawget(_G, "GetQuestItemInfo")
 	if type(num) ~= "function" or type(link) ~= "function" then return 0 end
 	local ok, n = pcall(num)
 	n = ok and Plain(n) or 0
 	if type(n) ~= "number" then return 0 end
 	for i = 1, n do
-		local okL, l = pcall(link, "choice", i)
+		local okL, l = pcall(link, kind, i)
 		l = okL and Plain(l) or nil
 		local count = 1
 		if type(info) == "function" then
-			local okI, _, _, c = pcall(info, "choice", i)
+			local okI, _, _, c = pcall(info, kind, i)
 			c = okI and Plain(c) or nil
 			if type(c) == "number" and c > 0 then count = c end
 		end

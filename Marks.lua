@@ -434,6 +434,10 @@ local function OnItemTooltip(lines, data)
 	if ns.Get("enabled") == false or ns.Get("tooltips") == false then return end
 	if ns.Overlap and ns.Overlap.Yields("tips") then return end
 	local link = type(data) == "table" and data.link or nil
+	-- (A quest reward's tooltip can come without a link: found among the page's rewards.)
+	if type(link) ~= "string" and type(data) == "table" and ns.Quest and ns.Quest.LinkFor then
+		link = ns.Quest.LinkFor(data.itemID)
+	end
 	if type(link) ~= "string" or type(lines) ~= "table" then return end
 	local entry = Lookup("tip", link)
 	if not entry then return end

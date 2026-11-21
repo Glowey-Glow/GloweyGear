@@ -574,12 +574,7 @@ local function Debug()
 	end
 	if ns.Overlap then
 		for _, surface in ipairs({ "bags", "tips" }) do
-			local names = {}
-			for _, rival in ipairs(ns.Overlap.Rivals(surface)) do
-				names[#names + 1] = rival.name .. (rival.can and " (switched by us)" or " (no switch)")
-			end
-			print(("other addons on %s: %s; ours %s"):format(surface, #names > 0 and table.concat(names, ", ") or "none",
-				ns.Overlap.Yields(surface) and "stands down" or "shows"))
+			print(("other addons on %s: %s"):format(surface, ns.Overlap.Describe(surface)))
 		end
 	end
 	if not ns.Game.Trees() then print("talent trees: not readable right now (the spec above was found without them)") end

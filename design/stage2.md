@@ -55,7 +55,7 @@ Paths: `DOC` = the client's generated API docs (`Blizzard_APIDocumentationGenera
 
 **What it reads, all public.** `QUEST_COMPLETE` (`DOC QuestLogDocumentation.lua:1332`), `QUEST_ITEM_UPDATE` and `QUEST_FINISHED` (`DOC QuestOfferDocumentation.lua:91`, `:79`); `GetNumQuestChoices`, `GetQuestItemLink("choice", i)`, `GetQuestItemInfo("choice", i)`, the calls the game's own quest frame makes (`FX Blizzard_UIPanels_Game\Mainline\QuestInfo.lua:526`, `:647`; `QuestFrame.lua:743`) and Daylight UI's quest window too (`DUI DaylightUI\Npc\Data.lua:141-147`).
 
-**The tooltip row needed nothing new.** Both windows show a reward with `GameTooltip:SetQuestItem` (`FX ...\QuestInfo.lua:1297`; `DUI DaylightUI\Npc\Window.lua:260-261`), an item tooltip, so the stage 1 row comes with it.
+**The tooltip row on a reward.** Both windows show a reward with `GameTooltip:SetQuestItem` (`FX ...\QuestInfo.lua:1297`; `DUI DaylightUI\Npc\Window.lua:260-261`). The client turns that into item tooltip data (`FX Blizzard_SharedXMLGame\Tooltip\TooltipDataHandler.lua:534`), Daylight UI's item post-call runs its plugins' "item" lines for it (`DUI DaylightUI_Tooltip\Tooltip.lua:1933-1938`), and our callback gets `data.link` and `data.itemID` (`:1344-1353`). The link is found from the data's guid, then its hyperlink, then `GameTooltip:GetItem` (`:705-722`); a reward the game is still loading can have none of the three. Then the row finds the link itself: the reward of the open quest page with that item ID (`Quest.LinkFor`: the choices and the fixed rewards). In the owner's first run the row was missing on a reward for another reason (the overlap state, section 5).
 
 **No mark on the reward tiles.** Daylight UI's API has no frame kind for them (`DUI DaylightUI\API.md:200-215`), the tiles are built inside its window (`Npc\Window.lua:281-297`), and the game's own reward buttons are parked while that window is up (`Npc\Window.lua:36-45`). A mark would mean reading Daylight UI's internal table several times a second. Not done (the study's recommendation).
 
@@ -84,6 +84,29 @@ Paths: `DOC` = the client's generated API docs (`Blizzard_APIDocumentationGenera
 **"Ours"** shows ours and switches the other addon's copy off where it has a switch an outside addon may flip; its value from before is kept and put back when the choice is reversed. **"Theirs"** hides ours on that surface (only while such an addon is loaded). Nothing of another addon's is touched before the question is answered.
 
 **Only where ours really shows (audit M5).** There is an overlap on a surface only while our side is on screen there: for bags, Show Gear Advice and Bag Slots on and Daylight UI's bags having taken our corner mark; for tooltips, Show Gear Advice and Item Tooltips on and Daylight UI's Tooltip module on. Otherwise no addon is a rival there, no question is asked, and anything taken is given back at once. This is looked at again at login, when an addon loads and when any setting of ours changes. Nothing is switched in a fight (it is done a moment after).
+
+**The truth table (after the first run in the game).** The first build treated a loaded addon as a rival whatever its own switches said. The owner had Polestar's gear advice switched off and had answered "theirs": Polestar showed nothing, ours stood down, and a tooltip had no advice at all. The debug line also said "(switched by us)" for any addon that merely HAS a switch. Now, per surface, another addon's feature is in one of four states:
+
+| Its state | Meaning | Is it a rival? |
+|---|---|---|
+| on | its feature shows | yes |
+| off by us | we switched it off (this character holds its value from before) | yes (it is what the answer was about; not asked again) |
+| off by the player | its own switch is off, or the addon's whole part is (Polestar: `gear.enabled`, `Polestar\Gear\Gear.lua:119-121`) | **no** |
+| no switch we can read | Pawn, Forever Leveling BiS, CheapUpgrades: taken to show whenever loaded | yes |
+
+And what happens, with ours on screen on that surface (otherwise: no rival, no question, everything taken is given back):
+
+| Rival's feature | Not asked yet | Answer "ours" | Answer "theirs" |
+|---|---|---|---|
+| on | both show; the question is pending | we switch it off (value kept): **ours shows** | ours stands down: **theirs shows** |
+| off by us | (cannot be: only an answer takes) | **ours shows** | given back: it is on again, ours stands down |
+| off by the player | **ours shows**, nothing asked | **ours shows**, nothing written | **ours shows**, nothing written (it is never turned on by us) |
+| no switch | both show; the question is pending | **both show** (the row says so) | ours stands down: theirs shows |
+| addon not loaded | ours shows | ours shows | ours shows |
+
+Ours stands down only when the player chose "theirs" and some rival's feature is really showing (on, or no switch). So a surface never has neither. If the player chose "theirs" and later turns theirs off, ours is back within a second, with no setting of ours changed (the other addon's switches are read again once a second at most). Restoring only ever writes back a value we took, and only where it is still off; a switch the player had off is never recorded and never turned on.
+
+`/gear debug` says one thing per surface: each loaded addon's state ("Polestar's is on", "Polestar's switched off by us", "Polestar's is off (by the player)", "Pawn is loaded (no switch we can read)"), then what ours does ("ours shows", "you chose theirs: ours stands down", "not asked yet: both show", "ours is switched off here, so nothing is asked or taken").
 
 **What was taken is remembered per character** (audit L9), because Polestar's settings follow its own profiles: a value taken on one character is put back on that character. Left open: two characters sharing one Polestar profile, where the second reverses the choice (the first's login puts it back).
 

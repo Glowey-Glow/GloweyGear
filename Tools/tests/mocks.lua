@@ -142,10 +142,12 @@ function Game.BagLinks(out)
 end
 function Game.InCombat() return WORLD.combat == true end
 -- WORLD.quest = { { link = , count = }, ... }: the rewards to choose between.
-function Game.QuestChoices(out)
+function Game.QuestChoices(out, kind)
 	called("QuestChoices")
-	for i, it in ipairs(WORLD.quest or {}) do out[i] = { link = it.link, count = it.count or 1 } end
-	return #(WORLD.quest or {})
+	local list = (kind == "reward" and WORLD.questRewards or WORLD.quest) or {}
+	if kind == "reward" and not WORLD.questRewards then list = {} end
+	for i, it in ipairs(list) do out[i] = { link = it.link, count = it.count or 1 } end
+	return #list
 end
 -- WORLD.hitMod = { melee, ranged, spell } (percent); nil = the game does not say (a fight).
 function Game.HitModifiers()

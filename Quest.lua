@@ -85,6 +85,25 @@ end
 
 function Quest.Best() return page and page.best or nil end
 
+-- The link of the quest reward with this item ID, among the choices and the fixed rewards of
+-- the page that is up, or nil. For a reward's tooltip that came without a link: Daylight UI
+-- finds a tooltip's link from its data's guid or hyperlink, else from GameTooltip:GetItem
+-- (DUI DaylightUI_Tooltip\Tooltip.lua:705-722), and a quest reward the game is still loading
+-- can have none of the three.
+local linkBuf = {}
+function Quest.LinkFor(itemID)
+	if type(itemID) ~= "number" then return nil end
+	for _, kind in ipairs({ "choice", "reward" }) do
+		for i = #linkBuf, 1, -1 do linkBuf[i] = nil end
+		local n = Game.QuestChoices(linkBuf, kind) or 0
+		for i = 1, n do
+			local link = linkBuf[i] and linkBuf[i].link
+			if type(link) == "string" and Stats.ItemID(link) == itemID then return link end
+		end
+	end
+	return nil
+end
+
 -- The sentence for a pick (also for the tests).
 function Quest.Line(pick)
 	if pick.kind == "upgrade" then

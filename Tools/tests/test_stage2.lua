@@ -609,4 +609,163 @@ T.case("the overlap window is built from Daylight UI's widgets and filled", func
 	rawset(_G, "UIParent", {})
 end)
 
+-- ---- the first run in the game: a rival feature that is off is no rival ----------------------
+T.case("a rival's feature the player turned off is no rival: ours shows, nothing is asked, nothing is taken", function()
+	fresh()
+	-- Polestar is loaded, its gear advice switched off by the player (as in the owner's game)
+	local theirs, sets = { ["gear.enabled"] = false }, { n = 0 }
+	polestar(theirs, sets)
+	addons = { Polestar = true }
+	Overlap.Changed()
+	T.eq(#Overlap.Rivals("bags"), 0, "bags: no rival"); T.eq(#Overlap.Rivals("tips"), 0, "tooltips: no rival")
+	T.eq(#Overlap.Unasked(), 0, "nothing to ask")
+	-- even with "theirs" chosen at some earlier time, ours shows
+	w.set("yieldBags", true); w.set("yieldTips", true)
+	T.eq(Overlap.Yields("bags"), false, "theirs is off: ours shows on bags, whatever was chosen")
+	T.eq(Overlap.Yields("tips"), false, "and on tooltips")
+	Overlap.Apply()
+	T.eq(sets.n, 0, "and nothing of Polestar's is written")
+	T.check(Overlap.Describe("tips"):find("Polestar's is off (by the player)", 1, true) and Overlap.Describe("tips"):find("ours shows", 1, true),
+		"debug says so: " .. Overlap.Describe("tips"))
+	-- the tooltip row is there
+	WORLD.worn[5] = gear({ name = "Worn Vest", raw = str(10) })
+	local better = gear({ name = "Better", raw = str(20) })
+	w.dui("Login")
+	local rows = {}
+	NS.Marks.OnItemTooltip({ Row = function(label, value) rows[#rows + 1] = label .. ": " .. value end, Text = function() end }, { link = better })
+	T.eq(#rows, 1, "the Gear Advice row shows")
+	-- only one of its two switches off: no rival there, a rival on the other surface
+	fresh()
+	theirs = { ["gear.tooltip"] = false }
+	polestar(theirs, sets)
+	addons = { Polestar = true }
+	Overlap.Changed()
+	T.eq(#Overlap.Rivals("tips"), 0, "its tooltip line off: no rival on tooltips")
+	T.eq(#Overlap.Rivals("bags"), 1, "its bag arrows on: a rival on bags")
+	rawset(_G, "Polestar", false)
+end)
+
+T.case("the truth table: never a surface with neither, and the words for each state", function()
+	-- theirs: on, or off by the player; the answer: none, ours, theirs. After Apply, per surface:
+	-- ours shows or theirs is on (or both, before an answer).
+	for _, theirsOn in ipairs({ true, false }) do
+		for _, answer in ipairs({ "none", "ours", "theirs" }) do
+			fresh()
+			local theirs, sets = { ["gear.tooltip"] = theirsOn and true or false }, { n = 0 }
+			polestar(theirs, sets)
+			addons = { Polestar = true }
+			Overlap.Changed()
+			if answer ~= "none" and #Overlap.Rivals("tips") > 0 then Overlap.Choose("tips", answer == "theirs") end
+			if answer == "theirs" then w.set("yieldTips", true) end
+			Overlap.Changed(); Overlap.Apply()
+			local oursShows = not Overlap.Yields("tips")
+			local theirsShows = on(theirs["gear.tooltip"])
+			local what = (theirsOn and "theirs on" or "theirs off by the player") .. ", answer " .. answer
+			T.check(oursShows or theirsShows, what .. ": one of the two shows")
+			if not theirsOn then
+				T.eq(oursShows, true, what .. ": ours shows"); T.eq(theirs["gear.tooltip"], false, what .. ": theirs stays off, never turned on by us")
+			elseif answer == "none" then
+				T.eq(oursShows and theirsShows, true, what .. ": both show until the question is answered")
+				T.check(Overlap.Describe("tips"):find("not asked yet", 1, true), "said so: " .. Overlap.Describe("tips"))
+			elseif answer == "ours" then
+				T.eq(oursShows, true, what .. ": ours shows"); T.eq(theirsShows, false, what .. ": theirs switched off")
+				T.check(Overlap.Describe("tips"):find("Polestar's switched off by us", 1, true) and Overlap.Describe("tips"):find("ours shows", 1, true),
+					"said so: " .. Overlap.Describe("tips"))
+			else
+				T.eq(oursShows, false, what .. ": ours stands down"); T.eq(theirsShows, true, what .. ": theirs on")
+				T.check(Overlap.Describe("tips"):find("Polestar's is on", 1, true) and Overlap.Describe("tips"):find("you chose theirs: ours stands down", 1, true),
+					"said so: " .. Overlap.Describe("tips"))
+			end
+		end
+	end
+	-- "theirs" chosen, then the player turns theirs off: ours comes back by itself
+	fresh()
+	local theirs, sets = {}, { n = 0 }
+	polestar(theirs, sets)
+	addons = { Polestar = true }
+	Overlap.Changed()
+	Overlap.Choose("tips", true)
+	T.eq(Overlap.Yields("tips"), true, "theirs chosen and on: ours stands down")
+	theirs["gear.tooltip"] = false
+	w.advance(2)
+	T.eq(Overlap.Yields("tips"), false, "the player turns theirs off: ours is back within a moment, with no setting of ours touched")
+	theirs["gear.tooltip"] = nil
+	theirs["gear.enabled"] = false
+	w.advance(2)
+	T.eq(Overlap.Yields("tips"), false, "the same with Polestar's whole gear part off")
+	-- "ours" chosen (we switched theirs off), then the player turns Polestar's gear part off:
+	-- what we took is given back, and stays off under their own master switch
+	fresh()
+	theirs = {}
+	polestar(theirs, sets)
+	addons = { Polestar = true }
+	Overlap.Changed()
+	Overlap.Choose("tips", false)
+	T.eq(theirs["gear.tooltip"], false, "taken")
+	T.eq(#Overlap.Rivals("tips"), 1, "switched off by us, it is still the rival the answer is about (not asked again)")
+	T.check(not table.concat(Overlap.Unasked(), ","):find("tips", 1, true), "tooltips are not asked about again")
+	rawset(_G, "Polestar", false)
+end)
+
+T.case("a quest reward's tooltip that comes without a link still gets its row", function()
+	T.reset()
+	character()
+	addons = {}
+	Overlap.Changed()
+	WORLD.worn[5] = gear({ name = "Worn Vest", raw = str(10) })
+	local reward = gear({ name = "Reward", raw = str(20) })
+	w.dui("Login")
+	WORLD.quest = { { link = gear({ name = "Other", raw = str(1) }) }, { link = reward } }
+	local rows = {}
+	local lines = { Row = function(label, value) rows[#rows + 1] = label .. ": " .. value end, Text = function() end }
+	NS.Marks.OnItemTooltip(lines, { link = nil, itemID = Stats.ItemID(reward) })
+	T.eq(#rows, 1, "the link is found among the quest's rewards by the item's ID")
+	T.check(rows[1] and rows[1]:find("+100%", 1, true), "and the row is the reward's: " .. tostring(rows[1]))
+	rows = {}
+	NS.Marks.OnItemTooltip(lines, { link = nil, itemID = 424242 })
+	T.eq(#rows, 0, "an item that is no reward of the page: no row, no error")
+	NS.Marks.OnItemTooltip(lines, { link = nil })
+	T.eq(#rows, 0, "nothing at all to go by: no row")
+	WORLD.quest = nil
+end)
+
+T.case("rows trickling in after the list was scored paint once a second at most", function()
+	T.reset()
+	character()
+	WORLD.worn[5] = gear({ name = "Worn Vest", raw = str(10) })
+	w.dui("Login")
+	local ah = w.ah
+	ah.rows = { { itemID = 1, link = gear({ name = "First", raw = str(12) }), buyout = 20000, count = 1 } }
+	ah.rows[1].itemID = Stats.ItemID(ah.rows[1].link)
+	ah.open = true
+	w.fire("AUCTION_HOUSE_SHOW"); w.fire("REPLICATE_ITEM_LIST_UPDATE")
+	for _ = 1, 600 do
+		w.frames(1)
+		if NS.Market.State() == "ready" and not NS.Market.Looking() then break end
+	end
+	Window.IsShown = function() return true end
+	Window.Refresh(true)
+	for _ = 1, 400 do
+		if not Window.S.running then break end
+		w.frames(1)
+	end
+	local job, before = Window.S.job, NS.Perf.Sum("show")
+	-- the tail: ten rows a frame for six seconds (3,000 rows)
+	for f = 1, 300 do
+		for i = 1, 10 do
+			local link = gear({ raw = str(11 + (f * 10 + i) % 40) })
+			NS.Fire("MarketAdded", Stats.Key(link), 20000 + f, "new", { 4, 4, "INVTYPE_CHEST", 0 })
+		end
+		w.frames(1)
+	end
+	w.advance(3)
+	T.check(Window.S.job == job, "the same job throughout")
+	local paints = NS.Perf.Sum("show") - before
+	T.check(paints >= 2 and paints <= 10, "3,000 rows over six seconds: a handful of paints, not one per batch (" .. paints .. ")")
+	T.check(#job.rows > 1000, "and the rows did come in (" .. #job.rows .. ")")
+	T.eq(Window.S.running, false, "the job is at rest at the end")
+	ah.open = false
+	w.fire("AUCTION_HOUSE_CLOSED")
+end)
+
 return T.done()

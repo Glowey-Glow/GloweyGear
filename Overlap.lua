@@ -91,7 +91,11 @@ local function Polestar()
 	return P
 end
 
--- The other addon's switch for a surface: get(), set(value); nil when it has none we may use.
+-- The other addon's switch for a surface: get(), set(value), and master() = whether the part
+-- of the addon the switch belongs to is on at all; nil when it has none we may use.
+-- Polestar: its gear advice has a switch of its own, "gear.enabled", above the two
+-- (Gear.IsEnabled: Polestar\Gear\Gear.lua:119-121; asked first at Gear\Bags.lua:58 and
+-- Gear\Tooltip.lua:155).
 local function Switch(rival, surface)
 	local path = rival[surface]
 	if type(path) ~= "string" then return nil end
@@ -101,7 +105,10 @@ local function Switch(rival, surface)
 		return function()
 			local ok, v = pcall(P.Get, path)
 			if ok then return v end
-		end, function(value) pcall(P.Set, path, value) end
+		end, function(value) pcall(P.Set, path, value) end, function()
+			local ok, v = pcall(P.Get, "gear.enabled")
+			return not (ok and v == false)
+		end
 	end
 	return nil
 end
@@ -118,35 +125,6 @@ function Overlap.Ours(surface)
 	end
 	if ns.Get("tooltips") == false then return false end
 	return not (type(ns.ModuleOff) == "function" and ns.ModuleOff("Tooltip"))
-end
-
--- Who is loaded and where ours shows is worked out once and kept (a bag asks for every slot
--- it paints): Overlap.Changed() forgets it, at login, when an addon loads, when a setting of
--- ours changes.
-local known = {}
-function Overlap.Changed()
-	known.bags, known.tips = nil, nil
-end
-
--- The other addons that do the same on a surface where ours shows: { { addon, name, can } }.
-function Overlap.Rivals(surface)
-	local out = known[surface]
-	if out then return out end
-	out = {}
-	if Overlap.Ours(surface) then
-		for _, rival in ipairs(RIVALS) do
-			if rival[surface] and Loaded(rival.addon) then
-				out[#out + 1] = { addon = rival.addon, name = rival.name, can = Switch(rival, surface) ~= nil }
-			end
-		end
-	end
-	known[surface] = out
-	return out
-end
-
-function Overlap.Yields(surface)
-	if ns.Get(SETTING[surface]) ~= true then return false end
-	return #Overlap.Rivals(surface) > 0
 end
 
 -- DaylightGearDB.overlap = { asked = { ["Addon:surface"] = true },
@@ -169,9 +147,87 @@ local function Took(o)
 	return o.took[guid]
 end
 
--- Makes the other addons' switches follow: a switch is taken (turned off, its value kept)
--- only while the question for it was answered, the answer is "ours", and ours really shows on
--- that surface; in every other case what this character took is put back. Never in a fight
+-- THE STATES OF A SURFACE (design\stage2.md, section 5, has the table).
+-- Another addon's feature there is one of:
+--   "on"    it shows;
+--   "ours"  it is off because WE switched it off (this character's `took` holds its value);
+--   "off"   it is off by the player's own hand (its switch, or the addon's part as a whole):
+--           then it is NO RIVAL: ours shows, nothing is asked, nothing of it is written;
+--   "fixed" it has no switch we can read: taken to be showing whenever the addon is loaded.
+-- A RIVAL is a loaded addon whose feature is "on", "ours" or "fixed", on a surface where ours
+-- is on screen (Overlap.Ours). Ours stands down only when the player chose "theirs" AND a
+-- rival's feature is really showing ("on" or "fixed"). So a surface never has neither.
+-- Everything is worked out once and kept for a second (a bag asks for every slot it paints,
+-- and the other addon's switches can change without a word to us); Overlap.Changed() forgets
+-- it at once: at login, when an addon loads, when a setting of ours changes, after Apply.
+local known, knownAt = {}, {}
+function Overlap.Changed()
+	known.bags, known.tips = nil, nil
+end
+
+-- Every listed addon that is loaded, with its feature's state on the surface.
+local function Listed(surface)
+	local now = ns.Game.Clock()
+	local list = known[surface]
+	if list and now - (knownAt[surface] or 0) < 1000 then return list end
+	list = { rivals = {}, showing = false }
+	local took = Took(State())
+	for _, rival in ipairs(RIVALS) do
+		if rival[surface] and Loaded(rival.addon) then
+			local get, _, master = Switch(rival, surface)
+			local state = "fixed"
+			if get then
+				local id = rival.addon .. ":" .. surface
+				if not master() then
+					state = "off"
+				elseif get() ~= false then
+					state = "on"
+				else
+					state = (took and took[id] ~= nil) and "ours" or "off"
+				end
+			end
+			local e = { addon = rival.addon, name = rival.name, can = get ~= nil, state = state }
+			list[#list + 1] = e
+			if state ~= "off" then list.rivals[#list.rivals + 1] = e end
+			if state == "on" or state == "fixed" then list.showing = true end
+		end
+	end
+	if not Overlap.Ours(surface) then list.rivals, list.showing = {}, false end
+	known[surface], knownAt[surface] = list, now
+	return list
+end
+
+-- The other addons that do the same on a surface where ours shows: { { addon, name, can, state } }.
+function Overlap.Rivals(surface) return Listed(surface).rivals end
+
+function Overlap.Yields(surface)
+	if ns.Get(SETTING[surface]) ~= true then return false end
+	return Listed(surface).showing
+end
+
+-- One line for /gear debug: each loaded addon's state, and what ours does.
+function Overlap.Describe(surface)
+	local list = Listed(surface)
+	local parts = {}
+	local o = State()
+	local unasked = false
+	for _, e in ipairs(list) do
+		local words = (e.state == "on" and "%s's is on") or (e.state == "ours" and "%s's switched off by us")
+			or (e.state == "off" and "%s's is off (by the player)") or "%s is loaded (no switch we can read)"
+		parts[#parts + 1] = words:format(e.name)
+		if e.state ~= "off" and not o.asked[e.addon .. ":" .. surface] then unasked = true end
+	end
+	local who = #parts > 0 and table.concat(parts, ", ") or "none"
+	if not Overlap.Ours(surface) then return who .. "; ours is switched off here, so nothing is asked or taken" end
+	if Overlap.Yields(surface) then return who .. "; you chose theirs: ours stands down" end
+	if #list.rivals > 0 and unasked then return who .. "; not asked yet: both show" end
+	return who .. "; ours shows"
+end
+
+-- Makes the other addons' switches follow. A switch is taken (turned off, its value kept)
+-- only while its feature is a rival that shows, the question for it was answered "ours", and
+-- ours is on screen on that surface. In every other case what this character took is put
+-- back (never more than that: a feature the player switched off stays off). Never in a fight
 -- (done a moment after it).
 local applySoon = false
 function Overlap.Apply()
@@ -191,11 +247,11 @@ function Overlap.Apply()
 	for _, surface in ipairs(SURFACES) do
 		local ours = Overlap.Ours(surface) and ns.Get(SETTING[surface]) ~= true
 		for _, rival in ipairs(RIVALS) do
-			local get, set = nil, nil
-			if rival[surface] and Loaded(rival.addon) then get, set = Switch(rival, surface) end
+			local get, set, master = nil, nil, nil
+			if rival[surface] and Loaded(rival.addon) then get, set, master = Switch(rival, surface) end
 			if get then
 				local id = rival.addon .. ":" .. surface
-				if ours and o.asked[id] then
+				if ours and o.asked[id] and master() then
 					local now = get()
 					if now ~= false then
 						if took[id] == nil then took[id] = now == nil and true or now end
@@ -208,6 +264,7 @@ function Overlap.Apply()
 			end
 		end
 	end
+	Overlap.Changed()
 end
 
 function Overlap.Unasked()

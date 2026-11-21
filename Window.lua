@@ -370,6 +370,26 @@ function Window.Rearrange()
 	Paint()
 end
 
+-- The list of a job that has ended, shown: the best per slot was kept as the rows came, so the
+-- end needs no sort of everything found (thousands of rows for a well-geared house): the live
+-- view IS the arrangement, unless a price dropped on a row already placed (then it is
+-- arranged once, in full).
+local function ShowEnded(job, t0)
+	job.shown = true
+	ns.Perf.Count("show")
+	if job.live.stale then
+		Window.Rearrange()
+	else
+		job.live.changed = false
+		S.view = job.live:View(job.rows)
+		Remodel()
+		S.painted = t0
+		Paint()
+	end
+	-- (The list is whole: is there a better buy than the last time? Alert.lua.)
+	if ns.Alert and ns.Market.Saved() then ns.Alert.Check(S.view, S.sig) end
+end
+
 local Step
 
 local function Tick(delay)
@@ -390,21 +410,23 @@ Step = function()
 	-- The job ended on the last tick: its list is shown now, on a frame of its own.
 	if S.ending then
 		S.ending, S.running = nil, false
-		-- The best per slot was kept as the rows came, so the end needs no sort of everything
-		-- found (thousands of rows for a well-geared house): the live view IS the arrangement,
-		-- unless a price dropped on a row already placed (then it is arranged once, in full).
-		if job.live.stale then
-			Window.Rearrange()
-		else
-			job.live.changed = false
-			S.view = job.live:View(job.rows)
-			Remodel()
-			S.painted = t0
-			Paint()
+		-- A job that had ended once and was given a few more items (rows the tail read late, a
+		-- new listing a search found) ends again within a frame or two, and again for the next
+		-- batch: its list is shown once a second at most, like every other change to the list.
+		-- (One paint per batch was 204 paints a minute while the tail fed 24,000 rows in play.)
+		if job.shown and t0 - (S.painted or 0) < REPAINT_MS then
+			if not S.showSoon then
+				S.showSoon = true
+				C_Timer.After((REPAINT_MS - (t0 - (S.painted or 0))) / 1000 + 0.01, function()
+					S.showSoon = false
+					-- (Running again: its own ticks paint, or its end comes back here.)
+					if S.job ~= job or S.running or not Shown() then return end
+					ShowEnded(job, Game.Clock())
+				end)
+			end
+			return
 		end
-		-- (The list is whole: is there a better buy than the last time? Alert.lua.)
-		if ns.Alert and ns.Market.Saved() then ns.Alert.Check(S.view, S.sig) end
-		return
+		return ShowEnded(job, t0)
 	end
 	-- The list fills in: only when what would be shown changed, not more than once a second,
 	-- and on a tick of its own (a paint and a slice of scoring in one frame would be two
