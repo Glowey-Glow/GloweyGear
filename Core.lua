@@ -144,7 +144,7 @@ local DEFAULTS = {
 	-- item level bottom left and the equipment-set mark top right (DaylightUI_Bags\Items.lua:499-500,
 	-- :686-696 in Daylight UI 2.1.2);
 	-- bottom right holds only stack counts, which gear never has.
-	dock = true,            -- (second half) the window docks to Daylight UI's Auction House
+	dock = true,            -- (second half) the window docks to the Auction House window
 	questPick = true,       -- (stage 2) a chat line naming the best reward of a quest with a choice
 	questSell = false,      -- (stage 2) with no upgrade among them, which sells for most. Off: Daylight UI's
 	-- quest window already marks that reward with a coin (DaylightUI\Npc\Window.lua:32, :292)
@@ -686,7 +686,7 @@ local pages = {
 			  desc = L["Most per Gold: the most improvement for each gold spent. Biggest Gain: the biggest improvement within your max price."],
 			  disabled = Off },
 			{ type = "toggle", key = "dock", label = L["Dock to the Auction House"],
-			  desc = L["The Upgrades for Sale window sits against Daylight UI's Auction House window while that is open."], disabled = Off },
+			  desc = L["The Upgrades for Sale window sits against the Auction House window while that is open."], disabled = Off },
 			{ type = "toggle", key = "alert", label = L["Chat Alert"],
 			  desc = L["One chat line when the Auction House has a better buy for a slot than last time."], disabled = Off },
 		} },

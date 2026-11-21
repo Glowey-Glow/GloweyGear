@@ -6,10 +6,8 @@ A plugin for Daylight UI, by Glowey (not part of Daylight UI itself: report its 
 
 ---
 
-## New in 1.0.3
-- **Profession gear:** gear that asks for a profession (engineering goggles, fishing hats and poles, the blacksmith's and alchemist's trinkets) is checked against your professions and your skill in them. One you can't equip is left out of the Auction House upgrades and gets no upgrade mark in your bags.
-- **Its tooltip says why:** "Needs Engineering (150)".
-
+## New in 1.0.4
+- **Docks to the game's Auction House too:** if you use the game's own Auction House window instead of Daylight UI's, the Gear window now sits flush against it, follows it and folds to its tab, just as it does beside Daylight UI's.
 ---
 
 ## What's in it
@@ -21,7 +19,7 @@ A plugin for Daylight UI, by Glowey (not part of Daylight UI itself: report its 
 - **Click an item** (or press A on a controller) to search it on the Buy page of Daylight UI's Auction House. **It never buys anything for you.**
 - **Prices stay true after the scan.** Whenever you look at an item in the Auction House, its row gets the current price, and items that sold out drop off the list. **Check Prices** looks up everything shown, one item at a time.
 - **Weapon pairs:** a main hand and an off hand that are the better buy together get one row, priced as a set.
-- **Docked** flush against Daylight UI's Auction House window while that is open, with a fold tab; on its own anywhere else. Open it with `/gear`.
+- **Docked** flush against Daylight UI's Auction House window while that is open (or the game's own Auction House window, if that's the one you use), with a fold tab; on its own anywhere else. Open it with `/gear`.
 
 ### Item tooltips
 - **One Gear Advice row** on gear tooltips, in both of Daylight UI's tooltip looks: "+12% over your Chest", "No better than your Chest", "Fills your empty Finger slot" or "Wearable at level 40". If you dual wield, a one-hand weapon is judged for the hand it helps most ("+8% over your Off Hand").

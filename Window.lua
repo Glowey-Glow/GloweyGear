@@ -20,8 +20,8 @@
 -- WHAT IT IS. A compact list (340 wide, as tall as its rows up to a limit, then it scrolls):
 -- one row per slot with the best pick for sale, the alternatives under the row that was
 -- clicked, and a footer with the two controls that matter while shopping (Max Price, Best
--- Pick: the same settings as the options page). While Daylight UI's Auction House window is
--- up and Dock to the Auction House is on, it sits flush against that window's right edge (the
+-- Pick: the same settings as the options page). While Daylight UI's Auction House window (or,
+-- without it, the game's own) is up and Dock to the Auction House is on, it sits flush against that window's right edge (the
 -- left one when the right has no room), tops level, and follows it; a small tab at that corner
 -- folds it away. Anywhere else /gear opens it as a window of its own that is dragged by
 -- its body and remembers its place.
@@ -34,7 +34,9 @@
 --   Host()          _G.DaylightUIAuctionHouse, the Auction House window's global name
 --                   (DaylightUI_AuctionHouse\Window.lua:33, made at :487 by Win.New, a plain
 --                   Frame with no secure template: DaylightUI\Windows\Frame.lua:288; no secure
---                   frame anywhere in that module). [a window of its own]
+--                   frame anywhere in that module). [the game's own AuctionHouseFrame while it
+--                   is the one on screen (Blizzard_AuctionHouseFrame.xml:4, a plain Frame),
+--                   docked to the same way; else a window of its own]
 --   SearchInDui()   the module's BuyPage.Submit(text, anywhere) (BuyPage.lua:560-567 in 2.1.2:
 --                   what Enter in its search box runs; anywhere = true searches every category,
 --                   as Daylight UI's own search for a linked item does, Window.lua:371; a 2.1.1
@@ -671,16 +673,32 @@ local function Visible(f)
 end
 
 -- Daylight UI's Auction House window while it is on screen, else nil.
-local function Host()
+local function DuiHost()
 	local f = _G.DaylightUIAuctionHouse
 	local ok, visible = pcall(Visible, f)
 	if ok and visible then return f end
 	return nil
 end
 
+-- The game's own Auction House window while it is the one on screen, else nil: the fall-back
+-- to dock to for a player who keeps it (Daylight UI's Auction House switched off, or another
+-- addon that builds on the game's window). Daylight UI parks this frame at no opacity while its
+-- own window stands in, which Visible() reads as not there. Only ever read and anchored to.
+local function GameHost()
+	local f = rawget(_G, "AuctionHouseFrame")
+	local ok, visible = pcall(Visible, f)
+	if ok and visible then return f end
+	return nil
+end
+
+-- The Auction House window to sit beside: Daylight UI's first, else the game's own.
+local function Host()
+	return DuiHost() or GameHost()
+end
+
 local function SearchInDui(name)
 	local m = ns.Market.DuiAH()
-	if not m or not Host() then return false end
+	if not m or not DuiHost() then return false end
 	local page, win = m.BuyPage, m.Window
 	if type(page) ~= "table" or type(page.Submit) ~= "function" then return false end
 	-- (Submit writes into the Buy page's own search box: the window must have been built.)
@@ -799,7 +817,8 @@ local function RowEnter(self)
 	if ns.Get("tooltips") == false and Window.Uncounted(e.row) then
 		GameTooltip:AddLine(L["Gear Advice does not count this item's special effect."], 0.72, 0.70, 0.66, true)
 	end
-	if Host() then
+	-- (Only Daylight UI's window takes the search: beside the game's own, a click says what to type.)
+	if DuiHost() then
 		local r, g, b = API.Accent()
 		GameTooltip:AddLine(L["Click: search for it in the Auction House"], r, g, b, true)
 	end
@@ -1399,7 +1418,7 @@ local function Build()
 	f.padTabsLabel = L["Best Pick"]
 	f.padFirst = function() return f.first or f.minus end
 	f.padSelect = function(stop)
-		if type(stop) == "table" and stop.entry and Host() then return L["Search"] end
+		if type(stop) == "table" and stop.entry and DuiHost() then return L["Search"] end
 		return nil
 	end
 	local P = Pad()

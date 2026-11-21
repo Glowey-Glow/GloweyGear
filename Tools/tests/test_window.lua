@@ -672,6 +672,33 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	f.scan:Click()
 	T.check(#w.chat > 0 and w.chat[#w.chat]:find("again in", 1, true), "inside the cooldown it says when: " .. tostring(w.chat[#w.chat]))
 	T.eq(ah.calls.ask, 0, "and asks nothing of the game")
+
+	-- the game's own Auction House window, Daylight UI's not up: docked to it the same way
+	local game = w.widget()
+	game.rect = { 16, 976, 900 }
+	function game:GetLeft() return self.rect[1] end
+	function game:GetRight() return self.rect[2] end
+	function game:GetTop() return self.rect[3] end
+	game.alpha = 1
+	function game:GetEffectiveAlpha() return self.alpha end
+	rawset(_G, "AuctionHouseFrame", game)
+	GloweyGearDB.window.folded = nil
+	w.update()
+	T.eq(Window.S.mode, "docked", "docked to the game's window"); T.eq(Window.S.side, "right", "on its right")
+	T.check(f.points[1][1] == "TOPLEFT" and f.points[1][2] == game and f.points[1][3] == "TOPRIGHT" and f.points[1][4] == 0
+		and f.points[1][5] == 0, "flush against its right edge, tops level")
+	T.eq(f.padSelect(chest), nil, "no Search there: only Daylight UI's window takes one")
+	-- parked at no opacity (Daylight UI's window standing in for it): not a host
+	game.alpha = 0
+	w.update()
+	T.check(Window.S.mode ~= "docked", "a parked game window is not docked to")
+	-- both up: Daylight UI's comes first
+	game.alpha = 1
+	host.shown = true
+	w.update()
+	T.check(Window.S.mode == "docked" and f.points[1][2] == host, "Daylight UI's window wins over the game's")
+	host.shown = false
+	rawset(_G, "AuctionHouseFrame", nil)
 	w.settings.AuctionHouse.enabled = true
 	rawset(_G, "DaylightUIAuctionHouse", false)
 end)

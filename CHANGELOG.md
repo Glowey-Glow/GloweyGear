@@ -1,5 +1,9 @@
 # Glowey's Gear (DaylightUI Plugin)
 
+## 1.0.4
+- The window docks to the game's own Auction House window too. Until now it only docked to Daylight UI's Auction House, so a player who keeps the game's window (Daylight UI's Auction House switched off, or an addon built on the game's window) got it loose on the screen. It now sits flush against that window's right edge (the left one when the right has no room), follows it, and folds to its tab the same way. Daylight UI's window still comes first when it is the one in use.
+- Beside the game's window a click on a row still says what to type in its search box: only Daylight UI's Buy page takes the search by itself.
+
 ## 1.0.3
 - Gear that asks for a profession is no longer recommended to a character who lacks it. Engineering goggles, the fishing hats and poles, the blacksmith's and alchemist's trinkets and the like (72 items, from the game's own item table) are checked against your professions and your skill in them: one you can't equip is left out of the Auction House upgrades and gets no upgrade mark in your bags.
 - Its tooltip says why instead: "Needs Engineering (150)".
