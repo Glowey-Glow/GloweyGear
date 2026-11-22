@@ -702,4 +702,32 @@ T.case("a verdict too long for the card's row goes on a line of its own, under i
 	T.eq(got[1], "Fills your empty Main Hand slot", "without lines.Text the row carries the sentence")
 end)
 
+T.case("GloweyGearAPI: another addon's question, answered and kept", function()
+	local M = boot({ shim = "own" })
+	local api = rawget(_G, "GloweyGearAPI")
+	T.check(type(api) == "table" and type(api.Upgrade) == "function" and type(api.Watch) == "function", "the table and its two calls")
+	local worn, better, worse = helm(10), helm(15), helm(5)
+	WORLD.worn[1] = worn
+	WORLD.bags = {}
+	owned()
+	verdicts, M.stats.computed = 0, 0
+	local up, text, color = api.Upgrade(better)
+	T.eq(up, true, "a better helm is an upgrade")
+	T.check(type(text) == "string" and text ~= "", "with the row's words: " .. tostring(text))
+	T.check(type(color) == "table", "and their color")
+	T.eq(api.Upgrade(worse), false, "a worse one is not")
+	T.eq(api.Upgrade(nil), false, "nor is nothing"); T.eq(api.Upgrade(42), false, "nor a number")
+	local n = verdicts
+	for _ = 1, 20 do api.Upgrade(better); api.Upgrade(worse) end
+	T.eq(verdicts, n, "asked again and again: the answers are kept")
+	-- told when the answers may have changed
+	local told = 0
+	T.eq(api.Watch(function() told = told + 1 end), true, "a watcher is taken"); T.eq(api.Watch("no"), false, "not a function: refused")
+	api.Watch(function() error("a watcher that raises") end)
+	WORLD.worn[1] = better
+	owned()
+	T.check(told >= 1, "what is worn changed: the watcher is told")
+	T.eq(api.Upgrade(better), false, "and the helm now worn is no upgrade over itself")
+end)
+
 return T.done()

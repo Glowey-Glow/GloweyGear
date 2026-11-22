@@ -356,17 +356,62 @@ local function Repaint()
 	end)
 end
 
+local watchers = {}       -- other addons' "your answers may have changed" (GloweyGearAPI.Watch)
+
 function Marks.Refresh()
 	if ns.Perf then ns.Perf.Count("bags") end
 	tipCache, bagCache, bankCache = {}, {}, {}
 	indexOf, wornKeys, carriedKeys = nil, nil, nil
 	pendingSeen = false
 	Repaint()
+	for _, fn in ipairs(watchers) do pcall(fn) end
 end
+
+-- ---------------------------------------------------------------------------------------------
+-- For other addons: GloweyGearAPI
+-- ---------------------------------------------------------------------------------------------
+-- The one thing another addon may ask of Glowey's Gear (Glowey's Recipes marks the recipes whose
+-- item would be an upgrade). A global table, so nothing of ours has to be read or copied:
+--
+--   GloweyGearAPI.Upgrade(link) -> true, text, { r, g, b }   an upgrade for this character now
+--                                                            (the bag mark's rule: up, far,
+--                                                            better, empty), with the tooltip
+--                                                            row's words ("+12% over your Chest")
+--                               -> false                     not one (or Gear is switched off,
+--                                                            or a fight is on: nothing is
+--                                                            worked out in one)
+--                               -> nil                       can't tell yet (the item's data has
+--                                                            not arrived): ask again after Watch
+--   GloweyGearAPI.Watch(fn)        fn() runs whenever the answers may have changed (gear put on,
+--                                  a level, a setting, item data arriving). Keep it cheap.
+--
+-- link: an item link or "item:12345". The item is judged as one you don't own yet. The answer
+-- for a link is kept, as the bags' is, so asking for every row of a list each repaint is fine.
+local function PublicUpgrade(link)
+	if type(link) ~= "string" or ns.Get("enabled") == false then return false end
+	local entry = Lookup("bank", link)
+	if entry == nil then return nil end
+	if not entry or not entry.mark then return false end
+	return true, entry.text, entry.color
+end
+rawset(_G, "GloweyGearAPI", {
+	version = 1,
+	Upgrade = function(link)
+		local ok, up, text, color = pcall(PublicUpgrade, link)
+		if not ok then return false end
+		return up, text, color
+	end,
+	Watch = function(fn)
+		if type(fn) ~= "function" then return false end
+		watchers[#watchers + 1] = fn
+		return true
+	end,
+})
 
 local function InUse()
 	if ns.Get("enabled") == false then return false end
-	return ns.Get("tooltips") ~= false or (shim ~= nil and ns.Get("bagMarks") ~= false)
+	-- (Another addon asks for answers too: GloweyGearAPI.Watch.)
+	return ns.Get("tooltips") ~= false or (shim ~= nil and ns.Get("bagMarks") ~= false) or #watchers > 0
 end
 
 -- What is owned, as one string: the worn and carried keys per group, in the pools' own (sorted)

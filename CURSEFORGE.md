@@ -6,8 +6,8 @@ A plugin for Daylight UI, by Glowey (not part of Daylight UI itself: report its 
 
 ---
 
-## New in 1.0.5
-- **Gear Advice on any tooltip:** the Gear Advice row now shows on item tooltips even with Daylight UI's tooltips switched off, or with another addon drawing your tooltips. Before, it only showed in Daylight UI's own tooltips.
+## New in 1.0.6
+- **Works with Glowey's Recipes:** with Recipes 3.0.7 or later, recipes whose crafted item would be a gear upgrade for you get an upgrade arrow in the recipe list.
 ---
 
 ## What's in it

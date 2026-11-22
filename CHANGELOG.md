@@ -1,5 +1,8 @@
 # Glowey's Gear (DaylightUI Plugin)
 
+## 1.0.6
+- Other addons can ask Gear whether an item is an upgrade (GloweyGearAPI.Upgrade, and GloweyGearAPI.Watch to hear when the answers change). Glowey's Recipes 3.0.7 uses it to put an upgrade arrow on the recipes whose item would be one for you. Nothing changes in Gear's own window, tooltips or bag marks.
+
 ## 1.0.5
 - The Gear Advice row shows on item tooltips without Daylight UI's tooltips too. Until now the row was handed to Daylight UI's Tooltip module, which only draws plugins' lines while it draws the tooltips itself: with that module switched off, or another addon styling the tooltips in its place, the row was gone. It is now written into the game's own tooltip in those cases, so the game's look or the other addon shows it. With Daylight UI's tooltips on, nothing changes.
 
