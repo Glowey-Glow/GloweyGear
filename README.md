@@ -6,7 +6,7 @@ Status: in development, not released. Stage 1 is built and audited; the first ru
 
 ## Requirements
 
-- Daylight UI 2.1 or later (checked against 2.1.2).
+- Nothing. Daylight UI 2.1 or later is optional (checked against 2.1.2): without it Host.lua stands in for it, and the settings are in /glowey.
 
 ## How it works
 

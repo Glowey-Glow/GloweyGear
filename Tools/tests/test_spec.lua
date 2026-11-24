@@ -226,4 +226,39 @@ T.case("the player: Spec.Current", function()
 	Spec.GetChoice = function() return "auto" end
 end)
 
+T.case("the player's own weights lie over the recommendation, stat by stat", function()
+	T.eq(#Spec.Load(data()), 0, "loads")
+	local own = {}
+	Spec.GetCustom = function(class, key) if class == "WARRIOR" and key == "ARMS" then return own end end
+	local base60 = Spec.Weights("WARRIOR", "ARMS", 60)
+	local w, n = Spec.Effective("WARRIOR", "ARMS", 60)
+	T.eq(w, base60, "none of the player's own: the recommendation itself"); T.eq(n, 0, "counted 0")
+	own.HIT, own.CRIT = 4, 0
+	Spec.Touched()
+	w, n = Spec.Effective("WARRIOR", "ARMS", 60)
+	T.eq(n, 2, "two of the player's own"); T.eq(w.HIT, 4, "the player's number"); T.eq(w.CRIT, 0, "a 0 counts")
+	T.eq(w.STR, 1, "the rest are the recommendation's"); T.eq(base60.HIT, 10, "the data is left alone")
+	T.eq(Spec.Effective("WARRIOR", "ARMS", 60), w, "kept until touched")
+	-- at a lower level the player's number stands; the rest slide
+	local w10 = Spec.Effective("WARRIOR", "ARMS", 10)
+	T.eq(w10.HIT, 4, "at every level"); T.near(w10.STA, 0.8, "the bracket's own for the rest")
+	own.HIT = 6
+	Spec.Touched()
+	T.eq(Spec.Effective("WARRIOR", "ARMS", 60).HIT, 6, "touched: built again")
+	own.HIT, own.CRIT, own.STR, own.BOGUS = -1, 0 / 0, "x", 3
+	Spec.Touched()
+	w, n = Spec.Effective("WARRIOR", "ARMS", 60)
+	T.eq(n, 0, "negative, not-a-number, words and unknown keys are never scored"); T.eq(w, base60, "so the recommendation stands")
+	T.eq(Spec.Effective("WARRIOR", "FURY", 60), Spec.Weights("WARRIOR", "FURY", 60), "another spec is untouched")
+	local named = Spec.Named("WARRIOR", "ARMS")
+	T.check(named.STR and named.STA and named.HIT, "Named lists the level 60 table's stats"); T.eq(named.CRIT, nil, "and only those the data names")
+	own = { HIT = 2 }
+	Spec.Touched()
+	WORLD.class, WORLD.level, WORLD.trees = "WARRIOR", 60, trees(31, 0, 0)
+	local who = Spec.Current()
+	T.eq(who.custom, 1, "Current says how many are the player's own"); T.eq(who.weights.HIT, 2, "and scores with them")
+	Spec.GetCustom = function() return nil end
+	Spec.Touched()
+end)
+
 return T.done()

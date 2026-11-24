@@ -6,9 +6,11 @@
 --   Spec.Info(class, key)                 -> the spec's table from the data, or nil
 --   Spec.Detect(class, trees, last)       -> key, how      how: "talents" | "default" | "last"
 --   Spec.Resolve(class, choice, trees, last) -> key, how   how also: "chosen"; nil when no weights
---   Spec.Weights(class, key, level)       -> { STR = 1, ... } | nil
+--   Spec.Weights(class, key, level)       -> { STR = 1, ... } | nil   (Glowey's recommendation)
+--   Spec.Effective(class, key, level)     -> weights, custom count    (the player's own on top)
+--   Spec.Touched()                        -> the player's own weights changed: build again
 --   Spec.Current()                        -> who | nil, why
---        who = { class, spec, level, weights, how };  why: "noclass" | "noweights" | "nolevel"
+--        who = { class, spec, level, weights, how, custom };  why: "noclass" | "noweights" | "nolevel"
 --
 -- The data is Data/Weights.lua (ns.WeightData), a pure table whose shape is the contract in
 -- design/data-format.md. This file checks it (a broken spec is left out, never an error) and
@@ -84,6 +86,7 @@ end
 -- Takes the data in. Returns what was left out and why, for the debug command and the tests.
 function Spec.Load(raw)
 	data, merged, anchored = {}, {}, {}
+	Spec.Touched()
 	local problems = {}
 	if type(raw) ~= "table" then return problems end
 	for class, c in pairs(raw) do
@@ -261,6 +264,62 @@ function Spec.Weights(class, key, level)
 	return w
 end
 
+-- ---------------------------------------------------------------------------------------------
+-- The player's own weights
+-- ---------------------------------------------------------------------------------------------
+-- Spec.GetCustom(class, key) gives the player's own weights for a spec: a sparse table of only
+-- the stats they set ({ STR = 1.2, HIT = 0 }), or nil. Core.lua points it at GloweyGearDB; left
+-- alone there are none. Each number the player set replaces Glowey's recommendation for that
+-- stat at EVERY level (a weight set by hand does not slide with the brackets); every stat they
+-- did not touch keeps following the shipped data, so a weight correction in a later version
+-- still reaches it. A 0 is a real choice ("worth nothing"), not the same as unset.
+Spec.GetCustom = function(_class, _key) return nil end
+
+local effective = {}   -- the recommendation's table -> { custom = table, rev = n, w = table, n = count }
+local rev = 0
+
+-- The player's weights changed somewhere: the next Effective builds its tables again.
+function Spec.Touched()
+	rev = rev + 1
+	effective = {}
+end
+
+-- The weights scoring uses: the recommendation for the level with the player's own on top, and
+-- how many of the player's own there are. Kept until Spec.Touched (the same table comes back, so
+-- "the weights changed" stays a plain table comparison); callers must not change it.
+function Spec.Effective(class, key, level)
+	local base = Spec.Weights(class, key, level)
+	if not base then return nil, 0 end
+	local custom = Spec.GetCustom(class, key)
+	if type(custom) ~= "table" or next(custom) == nil then return base, 0 end
+	local kept = effective[base]
+	if kept and kept.custom == custom and kept.rev == rev then return kept.w, kept.n end
+	local w, n = {}, 0
+	for k, v in pairs(base) do w[k] = v end
+	for k, v in pairs(custom) do
+		if ns.Stats.KEYS[k] and finite(v) and v >= 0 then
+			w[k] = v
+			n = n + 1
+		end
+	end
+	if n == 0 then w = base end
+	effective[base] = { custom = custom, rev = rev, w = w, n = n }
+	return w, n
+end
+
+-- Every stat key a spec's recommendation names, at any level (the level 60 table and every
+-- bracket): the stats the weights editor lists.
+function Spec.Named(class, key)
+	local s = Spec.Info(class, key)
+	local out = {}
+	if not s then return out end
+	for k in pairs(s.weights) do out[k] = true end
+	for _, b in ipairs(s.brackets or NONE) do
+		for k in pairs(b.weights) do out[k] = true end
+	end
+	return out
+end
+
 -- A spec's name for the player, in English (Core.lua passes ours through the locale table):
 -- our own word for a variant, else the game's name of the talent tree, else nil (the caller
 -- then shows the key). Second return: true when the word is ours and needs translating.
@@ -294,5 +353,6 @@ function Spec.Current()
 	local key, how = Spec.Resolve(class, Spec.GetChoice(), G.Trees(), last)
 	if not key then return nil, "noweights" end
 	if how == "talents" and key ~= last then Spec.SetLast(key) end
-	return { class = class, spec = key, level = level, how = how, weights = Spec.Weights(class, key, level) }
+	local weights, custom = Spec.Effective(class, key, level)
+	return { class = class, spec = key, level = level, how = how, weights = weights, custom = custom }
 end

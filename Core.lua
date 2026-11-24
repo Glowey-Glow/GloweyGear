@@ -8,7 +8,7 @@
 -- own), and the registration with Daylight UI with the first options page.
 -- The engine itself is Stats.lua, Spec.lua, Score.lua, Compare.lua and Rank.lua (pure Lua,
 -- tested offline: Tools/tests); every game call it needs is in Game.lua. ARCHITECTURE.md has
--- the whole map. Built on DaylightUI.API only; nothing of Daylight UI's is copied.
+-- the whole map. Built on DaylightUI.API, or without Daylight UI on Host.lua's stand-in for it; nothing of Daylight UI's is copied.
 --
 -- luacheck: read globals CreateFrame C_Timer geterrorhandler
 -- luacheck: read globals DEFAULT_CHAT_FRAME
@@ -16,8 +16,8 @@
 local ADDON, ns = ...
 local L = ns.L
 
-local DUI = _G.DaylightUI
-local API = DUI and DUI.API
+local DUI = ns.DUI or _G.DaylightUI   -- (ns.DUI: Host.lua; the global only in the offline tests)
+local API = ns.API or (DUI and DUI.API)   -- Daylight UI's, or without it Host.lua's stand-in
 if not API or API.major ~= 1 then
 	ns.off = true
 	return
@@ -151,6 +151,7 @@ local DEFAULTS = {
 	alert = true,           -- (stage 2) one chat line when a scan finds a better buy for a slot
 	yieldBags = false,      -- (stage 2) another addon marks bag upgrades and ours stands down
 	yieldTips = false,      -- (stage 2) the same for the tooltip row
+	spots = {},             -- saved window spots (Host.Spot: "window" = the Upgrades window, free)
 }
 ns.DEFAULTS = DEFAULTS
 
@@ -193,6 +194,8 @@ end
 --   updateCheck  Update.lua's switch (false = off)
 --   chars        [<character GUID>] = { spec = "auto" | "<SPEC KEY>", last = "<SPEC KEY>", name = "Name" }
 --   houses       (Market.lua) one saved gear list per Auction House
+--   weights      (MyWeights.lua) the player's own stat weights, only the stats they set:
+--                [<CLASS>][<SPEC KEY>] = { [<stat key>] = number }; account-wide
 local DB_VERSION = 2
 
 local function Migrate(db)
@@ -204,6 +207,7 @@ local function Migrate(db)
 	if type(db.v) ~= "number" or db.v > DB_VERSION or db.v < 2 then db.v = DB_VERSION end
 	if type(db.chars) ~= "table" then db.chars = {} end
 	if type(db.houses) ~= "table" then db.houses = {} end
+	if type(db.weights) ~= "table" then db.weights = {} end
 	return db
 end
 
@@ -357,6 +361,21 @@ end
 local function WhoChanged()
 	who, whoWhy, context = nil, nil, nil
 	ns.Fire("WhoChanged")
+end
+
+-- The player's own stat weights changed (MyWeights.lua): what is scored is stale at once, and the
+-- others hear "WhoChanged" a moment after the last change (a slider being dragged changes the
+-- weights at every step, and each "WhoChanged" scores the window's list again).
+local weightsSoon = false
+function ns.WeightsChanged()
+	Spec.Touched()
+	who, whoWhy, context = nil, nil, nil
+	if weightsSoon then return end
+	weightsSoon = true
+	C_Timer.After(0.25, function()
+		weightsSoon = false
+		WhoChanged()
+	end)
 end
 
 local function OwnedChanged()
@@ -550,7 +569,11 @@ local function Status()
 		end
 		return
 	end
-	ns.Print(L["Scoring gear for %s, level %d."]:format(specValues[w.spec] or w.spec, w.level))
+	if (w.custom or 0) > 0 then
+		ns.Print(L["Scoring gear for %s, level %d, with your own stat weights."]:format(specValues[w.spec] or w.spec, w.level))
+	else
+		ns.Print(L["Scoring gear for %s, level %d."]:format(specValues[w.spec] or w.spec, w.level))
+	end
 end
 
 local function Debug()
@@ -560,6 +583,12 @@ local function Debug()
 		print(("spec %s.%s (%s), level %d; weights: %s, confidence %s%s"):format(w.class, w.spec, tostring(w.how), w.level,
 			tostring(info.source), tostring(info.confidence),
 			info.sourcePath and (", " .. info.sourcePath .. " @ " .. tostring(info.sourceCommit):sub(1, 10)) or ""))
+		-- The player's own weights for this spec (MyWeights.lua), over the recommendation.
+		local own = ns.MyWeights and ns.MyWeights.Get(w.class, w.spec)
+		local list = {}
+		for key, value in pairs(own or {}) do list[#list + 1] = ("%s %.4g"):format(key, value) end
+		table.sort(list)
+		print("your own weights: " .. (#list > 0 and table.concat(list, ", ") or "none (all Glowey's recommendation)"))
 	end
 	-- The hit cap, as Compare.lua counts it.
 	local ctx = ns.Context()
@@ -613,6 +642,9 @@ local function Debug()
 	-- What Market.lua saw of the Auction House's list: events, rows read, rows skipped and why.
 	if ns.Market and ns.Market.Debug then
 		for _, line in ipairs(ns.Market.Debug()) do print(line) end
+		if ns.Sweep then
+			for _, line in ipairs(ns.Sweep.Debug()) do print(line) end
+		end
 	end
 end
 
@@ -645,7 +677,10 @@ local function Off(get) return get("enabled") == false end
 -- nothing for the switch to act on, so it is dimmed (API.IsModuleEnabled, DUI DaylightUI\API.lua
 -- :897-900; the modules register as "Tooltip" and "Bags": DaylightUI_Tooltip\Module.lua:9,
 -- DaylightUI_Bags\Module.lua:5). An API without the call dims nothing.
+-- Without Daylight UI (Host.lua) the tooltip row is drawn by TipFallback.lua, so it is on;
+-- the bag mark has no bags to go on, so its rows are hidden (NoDaylight below).
 local function ModuleOff(name)
+	if ns.standalone then return name ~= "Tooltip" end
 	if type(API.IsModuleEnabled) ~= "function" then return false end
 	local ok, on = pcall(API.IsModuleEnabled, name)
 	return ok and on == false
@@ -653,6 +688,7 @@ end
 ns.ModuleOff = ModuleOff
 local function NoTooltips() return ModuleOff("Tooltip") end
 local function NoBags() return ModuleOff("Bags") end
+local function NoDaylight() return ns.standalone == true end
 
 local pages = {
 	{ id = "gear", label = L["Gear Advice"],
@@ -703,10 +739,12 @@ local pages = {
 			  disabled = function(get) return get("enabled") == false or NoTooltips() end },
 			{ type = "toggle", key = "bagMarks", label = L["Bag Slots"],
 			  desc = L["A small mark on bag and bank slots that hold an upgrade."],
+			  hidden = NoDaylight,
 			  disabled = function(get) return get("enabled") == false or NoBags() end },
 			{ type = "dropdown", key = "bagCorner", label = L["Bag Corner"], values = CORNERS,
 			  order = { "top_left", "top_right", "bottom_left", "bottom_right" },
 			  desc = L["Which corner of the slot the mark sits in."],
+			  hidden = NoDaylight,
 			  disabled = function(get) return get("enabled") == false or get("bagMarks") == false or NoBags() end },
 		} },
 		{ label = L["Other Addons"], items = {
@@ -725,6 +763,9 @@ local pages = {
 		} },
 	  } },
 }
+
+-- Stat Weights: the player's own, and the way back to Glowey's recommendation (MyWeights.lua).
+if ns.MyWeights then table.insert(pages, ns.MyWeights.Page()) end
 
 -- The "Tell Me When a Newer Version Is Out" switch (Update.lua), on the first page.
 if ns.UpdateGroup then table.insert(pages[1].groups, ns.UpdateGroup()) end

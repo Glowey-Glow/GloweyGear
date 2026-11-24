@@ -25,6 +25,10 @@ local BAGS = L["A green plus on bag and bank slots that hold an upgrade."]
 -- them again). The first version's notes only ever show from that button: a new player gets
 -- the welcome, which marks them as read.
 local NEWS = {
+	{ version = "1.1.0", lines = {
+		L["Your own stat weights: the Stat Weights page in Gear's options has a box for each stat. Change any; the rest keep Glowey's recommendation, and Revert puts yours back."],
+		L["Works without Daylight UI: its settings are in Glowey's settings (/glowey). In Blizzard Style the Upgrades for Sale window docks flush beside the Auction House."],
+	} },
 	{ version = "1.0.0", lines = {
 		WINDOW,
 		TOOLTIP,
@@ -46,7 +50,8 @@ Guide.Setup({
 			WINDOW,
 			TOOLTIP,
 			BAGS,
-			L["Stat weights are a starting point and can be wrong for your build. Pick your spec in Daylight UI's options: Plugins > Gear."],
+			ns.standalone and L["Stat weights are a starting point and can be wrong for your build. Pick your spec in Glowey's settings: /glowey, Gear."]
+				or L["Stat weights are a starting point and can be wrong for your build. Pick your spec in Daylight UI's options: Plugins > Gear."],
 		}
 	end,
 	tour = "gear",
@@ -78,6 +83,10 @@ Guide.AddTour("gear", {
 	  text = L["Every piece of gear gets a score from its stats and your spec's stat weights. An item is an upgrade when it beats the best you own for that slot, worn or in your bags."] },
 	{ title = L["Upgrades for Sale"],
 	  text = function()
+		if ns.standalone then
+			return string.format(L["%s opens this list: the best upgrade on the Auction House for each slot. It fills after %s at the Auction House, and keeps the list for later."],
+				Pop("/gear"), Pop(L["Scan the Auction House"]))
+		end
 		return string.format(L["%s opens this list: the best upgrade on the Auction House for each slot. It fills after a Full scan in Daylight UI's Auction House, and keeps the list for later."], Pop("/gear"))
 	  end,
 	  -- (Shown for the card only when it was closed: a window the player had open stays open.)
@@ -100,8 +109,17 @@ Guide.AddTour("gear", {
 	  end },
 	{ title = L["Quest Rewards"],
 	  text = L["When a quest lets you choose a reward, a chat line names the biggest upgrade for you, and that reward's tooltip says so too."] },
+	{ title = L["Your Own Stat Weights"],
+	  text = function()
+		return string.format(L["%s in the options has a box for each stat your spec's weights use: type your own. Only the ones you change are yours; the rest keep following Glowey's recommendation, and %s puts a spec's back."],
+			Pop(L["Stat Weights"]), Pop(L["Revert This Spec"]))
+	  end },
 	{ title = L["About the Numbers"],
 	  text = function()
+		if ns.standalone then
+			return string.format(L["Stat weights are a starting point, not a final answer: they can be wrong for your build. Your spec and the other settings are in Glowey's settings: %s. %s there shows this tour again."],
+				Pop("/glowey"), Pop(L["Retake Tour"]))
+		end
 		return string.format(L["Stat weights are a starting point, not a final answer: they can be wrong for your build. Your spec and the other settings are in Daylight UI's options: %s. %s there shows this tour again."],
 			Pop(L["Plugins > Gear"]), Pop(L["Retake Tour"]))
 	  end },

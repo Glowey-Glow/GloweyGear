@@ -5,12 +5,13 @@
 --   Market.Feed(job)  -> n         adds every saved listing to a Rank.Job
 --   Market.Age()      -> seconds since the list was read, or nil
 --   Market.State()    -> "none" | "reading", done, total | "ready"
---   Market.CanScan()  -> ok, why, secondsLeft     why: "other" (DaylightMogul runs the house and
---                        scans it itself), "dui" (Daylight UI's Auction House is the
---                        one in use: its Full Scan is the way), "noapi", "closed", "busy",
---                        "cooldown" (with the seconds left)
---   Market.Scan()     -> ok, why   asks the game for the list once (our own button only; never
---                        by itself). Also "throttled": the game is not taking messages now.
+--   Market.CanScan()  -> ok, why     why: "other" (DaylightMogul runs the house and scans it
+--                        itself, or another installed addon does full scans: see
+--                        Market.Others), "dui" (Daylight UI's Auction House is the one in
+--                        use: its Full Scan is the way), "noapi", "closed", "busy" (ours runs)
+--   Market.Scan()     -> ok, why   our own scan of the weapons and armor (Sweep.lua; our own
+--                        button only, never by itself)
+--   Market.Store(items, rows, startedAt, lost)   puts a finished scan of ours in place
 --   Market.House()    -> the key the list is saved under
 --   Market.IsOpen()   -> an Auction House is open
 --   Market.Debug()    -> lines for /gear debug: what Market saw, read and skipped, and why
@@ -63,7 +64,7 @@
 --     documents none).
 --
 -- luacheck: read globals C_AuctionHouse CreateFrame C_Timer UnitName
--- luacheck: read globals GetServerTime issecretvalue geterrorhandler time
+-- luacheck: read globals GetServerTime issecretvalue geterrorhandler time C_AddOns
 
 local _, ns = ...
 if ns.off or not ns.ok then return end
@@ -92,8 +93,6 @@ local TUNE = {
 	EMPTY_MS = 15000,     -- an empty list gets this long to fill
 	ITEM_MS = 15000,      -- no item arriving for this long ends the wait for items
 	ITEM_MAX_MS = 300000, -- and the wait never lasts longer than this after the last row was walked
-	ASK_S = 90,           -- seconds our own ask waits for the list
-	COOLDOWN = 900,       -- seconds between two asks of ours, per house
 	KEEP_DAYS = 30,       -- a house not read for this long is dropped at login
 }
 Market.TUNE = TUNE
@@ -1236,17 +1235,6 @@ function Market.State()
 	return "none"
 end
 
-local function CooldownLeft()
-	local e = Entry()
-	if not e then return 0 end
-	-- (A list read a moment ago was asked for by somebody: the game's limit counts all the same.)
-	local last = math.max(tonumber(e.asked) or 0, tonumber(e.at) or 0)
-	local ago = Now() - last
-	-- (A clock that went back holds nothing up.)
-	if last <= 0 or ago < 0 or ago >= TUNE.COOLDOWN then return 0 end
-	return TUNE.COOLDOWN - ago
-end
-
 -- DaylightMogul runs the Auction House: it scans the whole house itself, and the game allows
 -- everybody together one such scan in about fifteen minutes. A scan of ours would spend the one
 -- it needs, so none is offered; the list it fetches is read like any other.
@@ -1255,46 +1243,88 @@ local function MogulOwns()
 	return type(D) == "table" and D.ahMogul == true
 end
 
+-- Other Auction House addons with a full scan of their own (the folder name -> its name for the
+-- window). The game allows everybody together one full scan in about fifteen minutes, so while one
+-- of these is installed and enabled for this character ours is not offered: its scan fills the
+-- same list, and Gear reads that list whoever asked for it. Daylight UI's Auction House is not
+-- here: DuiAH() above knows whether its window (and so its Full Scan) is the one in use.
+local SCANNERS = {
+	{ "DaylightMogul", "Daylight Mogul" },
+	{ "Auctionator", "Auctionator" },
+	{ "AuctionLite", "AuctionLite" },
+}
+Market.SCANNERS = SCANNERS
+
+-- The names of the ones installed and enabled for this character, in SCANNERS' order (read once:
+-- an addon switched on or off counts from the next reload, as the game loads it). `again` reads anew.
+local scanners
+function Market.Others(again)
+	if scanners and not again then return scanners end
+	scanners = {}
+	local A = C_AddOns
+	if type(A) ~= "table" or type(A.DoesAddOnExist) ~= "function" or type(A.GetAddOnEnableState) ~= "function" then
+		return scanners
+	end
+	local okN, who = pcall(UnitName, "player")
+	who = okN and plain(who) or nil
+	for _, s in ipairs(SCANNERS) do
+		local okE, exists = pcall(A.DoesAddOnExist, s[1])
+		if okE and exists then
+			local okS, state = pcall(A.GetAddOnEnableState, s[1], who)
+			if okS and type(state) == "number" and state > 0 then scanners[#scanners + 1] = s[2] end
+		end
+	end
+	return scanners
+end
+
 function Market.CanScan()
 	if DuiAH() then return false, "dui" end
-	if MogulOwns() then return false, "other" end
-	local a = AH()
-	if not a or type(a.ReplicateItems) ~= "function" then return false, "noapi" end
+	if MogulOwns() or #Market.Others() > 0 then return false, "other" end
+	local S = ns.Sweep
+	if not S or not S.Possible() then return false, "noapi" end
 	if not open then return false, "closed" end
-	if job or asking then return false, "busy" end
-	local left = CooldownLeft()
-	if left > 0 then return false, "cooldown", left end
+	if S.Running() then return false, "busy" end
 	return true
 end
 
--- Asks the game for the whole list: C_AuctionHouse.ReplicateItems (DOC
--- AuctionHouseDocumentation.lua:946; not flagged HasRestrictions, so no click is needed, but
--- this is only ever called from our own button). The cooldown counts from the ask, whatever
--- happens next (as Daylight UI does: Scan.lua:15-18).
+-- Our own scan: Sweep.lua goes through the Auction House's weapon and armor categories, page by
+-- page (it replaced an ask for the game's whole-house list, which the game answers once in 15
+-- minutes for every addon together and otherwise ignores without a word). A scan that was
+-- paused (the Auction House closed, or Stop Scan) goes on where it stopped.
 function Market.Scan()
-	local ok, why, left = Market.CanScan()
-	if not ok then return false, why, left end
-	local a = C_AuctionHouse
-	if type(a.IsThrottledMessageSystemReady) == "function" then
-		local got, ready = pcall(a.IsThrottledMessageSystemReady)
-		if got and ready == false then return false, "throttled" end
-	end
+	local ok, why = Market.CanScan()
+	if not ok then return false, why end
+	return ns.Sweep.Start()
+end
+
+-- What can be known of an item without loading it, as a saved string carries it (see Parse):
+-- "class.subclass.level.location", or nil.
+function Market.Facts(itemID, minLevel)
+	local equipLoc, classID, subclassID = Game.ItemInstant(itemID)
+	local code = equipLoc and LOC_CODE[equipLoc]
+	if not code or type(classID) ~= "number" or type(subclassID) ~= "number" then return nil end
+	return ("%d.%d.%d.%d"):format(classID, subclassID, tonumber(minLevel) or 0, code)
+end
+
+-- A finished scan of ours put in place as this house's list: items are saved strings (see
+-- Parse), rows how many results the scan read, startedAt the server's time it began. Corrections
+-- older than the scan go, as with any new list.
+function Market.Store(items, rows, startedAt, lost)
 	local e = Entry(true)
-	if not e then return false, "closed" end
-	if not pcall(a.ReplicateItems) then return false, "noapi" end
-	e.asked = Now()
-	local mine = { at = Game.Clock() }
-	asking = mine
-	dbg.asked = (dbg.asked or 0) + 1
-	C_Timer.After(TUNE.ASK_S, function()
-		if asking ~= mine then return end
-		asking = nil
-		dbg.askTimedOut = true
-		tell()
-	end)
-	tell(0, 0)
+	if not e then return false end
+	e.at, e.rows, e.by, e.items = Now(), rows or #items, "own", items
+	e.lost, e.lostRows = lost or 0, 0
+	e.readAt = startedAt or e.at
+	for key, at in pairs(type(e.fixT) == "table" and e.fixT or {}) do
+		if at <= e.readAt then e.fixT[key], e.fixP[key] = nil, nil end
+	end
+	decoded, decodedFrom = nil, nil
+	ns.Fire("MarketChanged")
 	return true
 end
+
+function Market.Now() return Now() end
+Market.Plain = plain
 
 -- ---------------------------------------------------------------------------------------------
 -- /gear debug
@@ -1362,6 +1392,7 @@ function Market.Debug()
 	else
 		add("nothing saved for this house")
 	end
+	add("other addons with a full scan: %s", #Market.Others() > 0 and table.concat(Market.Others(), ", ") or "none")
 	local ok, whyNot, left = Market.CanScan()
 	add("our own read: %s", ok and "available" or (tostring(whyNot) .. (left and (" (" .. math.ceil(left) .. " s)") or "")))
 	return out

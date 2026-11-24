@@ -7,6 +7,7 @@
 
 local w = T.world()
 w.load("Market.lua")
+w.load("Sweep.lua")
 rawset(_G, "UIParent", {})
 rawset(_G, "GameTooltip", {})
 rawset(_G, "C_Item", {})
@@ -116,6 +117,8 @@ T.case("which sentence stands in for an empty list", function()
 	key = state({ who = false, whoWhy = "nolevel" }); T.eq(key, "notready", "the character is not ready")
 	key = state({ market = "none", hasList = false }); T.eq(key, "nolist", "no list: run a Full Scan")
 	key = state({ market = "none", hasList = false, dui = false }); T.eq(key, "nolistown", "no list: our own read")
+	key, text = state({ market = "none", hasList = false, dui = false, other = "Auctionator" })
+	T.eq(key, "nolistother", "no list: another addon's full scan"); T.check(text:find("Auctionator", 1, true), "names it: " .. text)
 	key, text = state({ market = "reading", hasList = false, done = 1200, total = 30000 })
 	T.eq(key, "reading", "the first list is being read"); T.check(text:find("1200 of 30000", 1, true), "with its progress: " .. text)
 	key = state({ market = "reading", hasList = false, done = 0, total = 0 }); T.eq(key, "asking", "asked, no rows yet")
@@ -523,6 +526,29 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	local tip = w.widget()
 	tip.shown = false
 	rawset(_G, "GameTooltip", tip)
+	-- A stand-in for Host.lua's calls (ns.Host): what the window hands it is kept; Daylight UI's
+	-- global scale is 0.5 here, so a window given it shows.
+	local hosted, spots = {}, {}
+	NS.Host = {
+		Window = function(frame, opts) hosted[frame] = opts return true end,
+		Scaled = function(frame, opts) hosted.scaled = { frame = frame, opts = opts } end,
+		Rescale = function(frame)
+			local o = hosted.scaled.opts
+			frame:SetScale(o.own() * (o.docked() and 1 or 0.5))
+		end,
+		Moved = function() hosted.moved = (hosted.moved or 0) + 1 end,
+		Spot = function(key, legacy)
+			local s = {}
+			function s.Get()
+				if spots[key] then return spots[key] end
+				local old = legacy.get()
+				if old then spots[key] = old; legacy.clear() end
+				return old
+			end
+			function s.Save(t) spots[key] = t return true end
+			return s
+		end,
+	}
 	local followed = {}
 	NS.Pad = { On = function() return true end, Follow = function(frame, close) followed[frame] = close or true end,
 		Stick = function() end, Settle = function(aim) followed.aim = aim end }
@@ -540,6 +566,9 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	local f, tab = Window.frame, Window.tab
 	T.check(f ~= nil and f:IsShown(), "shown"); T.eq(Window.S.mode, "free", "on its own (no Auction House window)")
 	T.check(followed[f] ~= nil and followed[tab] ~= nil, "the window and its tab are given to the controller kit")
+	T.check(hosted[f] ~= nil and type(hosted[f].close) == "function", "the window is given to Host.Window, with its Escape")
+	T.eq(hosted.scaled.frame, f, "and to Host.Scaled")
+	T.eq(hosted[f].room(), true, "on its own: in Daylight UI's window room"); T.eq(f:GetScale(), 0.5, "with Daylight UI's scale")
 	T.check(scored(), "scored on showing")
 	T.eq(#Window.S.model, 2, "two slot rows"); T.check(f.first ~= nil and f.first.entry.group == "HEAD", "the first row is the first slot")
 	T.check(skinned > 0, "the shell is laid out"); T.check(not tab:IsShown(), "no tab on its own")
@@ -593,6 +622,8 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 		and f.points[1][5] == 0, "flush against the host's right edge, tops level")
 	T.check(tab.points[1][2] == f and tab.points[1][3] == "TOPRIGHT", "the tab at the window's outer top corner")
 	T.eq(f.padSecond, true, "beside the Auction House it does not take the controller's cursor")
+	T.eq(hosted[f].room(), false, "docked: not in the window room"); T.eq(f:GetScale(), 1, "nor Daylight UI's scale on top of the host's")
+	T.check((hosted.moved or 0) > 0, "the room is told it docked")
 	T.eq(f.padSelect(chest), "Search", "A says Search there")
 	chest:Click()
 	T.eq(host.searched, "B", "a click searches the best pick in the Buy page")
@@ -622,14 +653,10 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	w.update()
 	T.eq(Window.S.mode, "docked", "docked again once there is room")
 
-	-- Escape belongs to the Auction House window while docked: ours is not on the game's list
-	local function special()
-		for _, name in ipairs(UISpecialFrames) do
-			if name == "GloweyGearWindow" then return true end
-		end
-		return false
-	end
-	T.eq(special(), false, "docked: Escape is not ours")
+	-- Escape belongs to the Auction House window while docked: Host.Window's close() leaves it be
+	hosted[f].close()
+	T.check(f:IsShown() and Window.S.mode == "docked", "docked: Escape is not ours")
+	T.eq(GloweyGearDB.window.folded, nil, "and folds nothing")
 
 	-- docking switched off: not shown by itself
 	w.set("dock", false)
@@ -645,17 +672,29 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	T.eq(Window.S.mode, "hidden", "gone with the Auction House"); T.check(not f:IsShown() and not tab:IsShown(), "window and tab")
 	Window.Toggle()
 	T.eq(Window.S.mode, "free", "/gear: on its own"); T.eq(f.padSecond, nil, "taking the controller's cursor")
-	T.eq(special(), true, "on its own: Escape closes it")
+	hosted[f].close()
+	T.check(not f:IsShown() and Window.S.free == false, "on its own: Escape closes it")
+	Window.Toggle()
 	f:Hide()
 	T.eq(Window.S.free, false, "hidden by the game: closed, and it stays closed")
 	Window.Toggle()
-	T.check(f:IsShown() and #UISpecialFrames == 1, "open again, listed once")
+	T.check(f:IsShown(), "open again")
+	T.eq(#UISpecialFrames, 0, "the window's own name is never on the game's Escape list (Host.Window's stand-in is)")
 	function f.GetLeft() return 700 end
 	function f.GetTop() return 650 end
+	local moved = hosted.moved or 0
 	f.scripts.OnDragStart(f); f.scripts.OnDragStop(f)
-	T.eq(GloweyGearDB.window.x, 700, "its place is kept"); T.eq(GloweyGearDB.window.y, 650, "both ways")
+	T.eq(spots.window.x, 350, "its place is kept, in UIParent units (Host.Spot)"); T.eq(spots.window.y, 325, "both ways")
+	T.eq(GloweyGearDB.window.x, nil, "not in the account's saved state any more")
+	T.eq(#f.points, 1, "anchored by one point after a drag"); T.eq(hosted.moved, moved + 1, "and the room is told")
 	Window.Close(); Window.Open()
 	T.check(f.points[1][1] == "TOPLEFT" and f.points[1][4] == 700 and f.points[1][5] == 650, "and it opens there again")
+	-- a spot saved the old way (GloweyGearDB.window.x / y) is moved into Host.Spot once
+	spots.window = nil
+	GloweyGearDB.window.x, GloweyGearDB.window.y = 100, 200
+	Window.Close(); Window.Open()
+	T.check(f.points[1][4] == 200 and f.points[1][5] == 400, "the old spot is used")
+	T.check(spots.window and spots.window.x == 100 and GloweyGearDB.window.x == nil, "moved in, and cleared there")
 
 	-- an empty state paints too, and our own read's button shows only when it is the way
 	T.check(not f.scan:IsShown(), "no Read button while Daylight UI's Auction House is the one in use")
@@ -668,10 +707,17 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	w.set("enabled", true)
 	w.frames(2)
 	T.check(scored(), "scored again")
-	T.check(f.scan:IsShown(), "the Read button where our own read is the way")
+	T.check(f.scan:IsShown(), "the Scan button where our own scan is the way")
+	T.eq(f.scan.text:GetText(), NS.L["Scan the Auction House"], "named for what it does")
+	T.check(not f.bar:IsShown(), "no bar before a scan")
 	f.scan:Click()
-	T.check(#w.chat > 0 and w.chat[#w.chat]:find("again in", 1, true), "inside the cooldown it says when: " .. tostring(w.chat[#w.chat]))
-	T.eq(ah.calls.ask, 0, "and asks nothing of the game")
+	T.eq(NS.Sweep.Running(), true, "a click starts the scan")
+	T.eq(f.scan.text:GetText(), NS.L["Stop Scan"], "the button stops it now"); T.check(f.bar:IsShown(), "and the bar shows")
+	T.check(f.barText:GetText():find("categories", 1, true), "with how far it is: " .. tostring(f.barText:GetText()))
+	f.scan:Click()
+	T.eq(NS.Sweep.Running(), false, "a second click pauses it")
+	T.eq(f.scan.text:GetText(), NS.L["Resume Scan"], "and the button goes on with it"); T.check(f.bar:IsShown(), "the bar stays")
+	T.eq(ah.calls.ask, 0, "the whole-house list is never asked for")
 
 	-- the game's own Auction House window, Daylight UI's not up: docked to it the same way
 	local game = w.widget()
@@ -687,7 +733,29 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	T.eq(Window.S.mode, "docked", "docked to the game's window"); T.eq(Window.S.side, "right", "on its right")
 	T.check(f.points[1][1] == "TOPLEFT" and f.points[1][2] == game and f.points[1][3] == "TOPRIGHT" and f.points[1][4] == 0
 		and f.points[1][5] == 0, "flush against its right edge, tops level")
-	T.eq(f.padSelect(chest), nil, "no Search there: only Daylight UI's window takes one")
+	T.eq(f.padSelect(chest), NS.L["Search"], "the controller's Search there too")
+	-- a click searches in the game's window: Buy tab, no category, the name, the search
+	local did = {}
+	rawset(_G, "AuctionHouseFrameDisplayMode", { Buy = "buy", ItemBuy = "itembuy", CommoditiesBuy = "cbuy", ItemSell = "sell" })
+	game.displayMode = "sell"
+	function game:SetDisplayMode(mode) self.displayMode = mode; did[#did + 1] = "mode:" .. mode end
+	local cats = { SetSelectedCategory = function(_, picked) did[#did + 1] = "category:" .. tostring(picked) end }
+	function game.GetCategoriesList() return cats end
+	game.SearchBar = {
+		SetSearchText = function(_, text) did[#did + 1] = "text:" .. text end,
+		StartSearch = function() did[#did + 1] = "search" end,
+	}
+	local lines = #w.chat
+	T.eq(Window.Search({ name = "Jade Ring of the Bear" }), true, "the game's window took it")
+	T.eq(table.concat(did, ","), "mode:buy,category:nil,text:Jade Ring of the Bear,search", "Buy tab, any category, the name, searched")
+	T.eq(#w.chat, lines, "no chat line")
+	did = {}
+	T.eq(Window.Search({ name = "Onyx Ring" }), true, "again")
+	T.eq(table.concat(did, ","), "category:nil,text:Onyx Ring,search", "already buying: no tab change")
+	game.SearchBar.StartSearch = function() error("changed") end
+	T.eq(Window.Search({ name = "Onyx Ring" }), false, "a search bar that raises is caught")
+	T.check(w.chat[#w.chat]:find("Type Onyx Ring in", 1, true), "and the player is told what to type")
+	game.SearchBar = nil
 	-- parked at no opacity (Daylight UI's window standing in for it): not a host
 	game.alpha = 0
 	w.update()

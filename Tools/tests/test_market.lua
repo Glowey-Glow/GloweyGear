@@ -6,6 +6,7 @@
 
 local w = T.world()
 w.load("Market.lua")
+w.load("Sweep.lua")
 local Market, Stats = NS.Market, NS.Stats
 local ah = w.ah
 
@@ -308,7 +309,7 @@ T.case("never a scan of our own while Daylight UI's Auction House is in use", fu
 	T.eq(ok, false, "Scan refuses"); T.eq(why, "dui", "and says why"); T.eq(ah.calls.ask, 0, "nothing was asked of the game")
 end)
 
-T.case("our own read: only when allowed, once in 15 minutes", function()
+T.case("our own scan: only when allowed", function()
 	fresh()
 	GloweyGearDB.houses = {}
 	Market.Prune()
@@ -318,38 +319,13 @@ T.case("our own read: only when allowed, once in 15 minutes", function()
 	T.eq(ok, false, "closed"); T.eq(why, "closed", "says closed")
 	open()
 	T.eq(Market.CanScan(), true, "allowed at the open Auction House")
-	ah.ready = false
-	ok, why = Market.Scan()
-	T.eq(ok, false, "the game is not taking messages"); T.eq(why, "throttled", "says so"); T.eq(ah.calls.ask, 0, "nothing sent")
-	ah.ready = true
-	T.eq(Market.Scan(), true, "asked"); T.eq(ah.calls.ask, 1, "once")
-	local state, done, total = Market.State()
-	T.eq(state, "reading", "waiting for the list"); T.eq(done, 0, "0"); T.eq(total, 0, "of 0")
-	ok, why = Market.Scan()
-	T.eq(ok, false, "not twice"); T.eq(why, "busy", "busy")
-	local a = gear()
-	row(a, 123)
-	listArrives(); w.frames(1)
-	T.check(settle(), "read")
-	T.eq(Market.List().by, "own", "the list is our own"); T.eq(priceOf(a), 123, "with its row")
-	local left
-	ok, why, left = Market.CanScan()
-	T.eq(ok, false, "not again"); T.eq(why, "cooldown", "cooldown"); T.check(left > 800 and left <= 900, "about 15 minutes left (" .. tostring(left) .. ")")
-	T.eq(Market.Scan(), false, "Scan refuses too"); T.eq(ah.calls.ask, 1, "still one ask")
-	w.time = w.time + 901
-	T.eq(Market.CanScan(), true, "allowed again after 15 minutes")
-	-- an ask that gets no answer frees the state after its wait
-	T.eq(Market.Scan(), true, "asked again")
-	w.advance(91)
-	T.eq(Market.State(), "ready", "no answer: back to the saved list")
-	T.eq(select(2, Market.CanScan()), "cooldown", "but the ask still counts")
+	T.eq(ah.calls.ask, 0, "the whole-house list is never asked for")
 	-- another addon's scan, with Daylight UI's house not in use
-	w.time = w.time + 901
 	ah.rows = {}
 	row(gear(), 5); row(gear(), 6)
 	listArrives(); w.frames(1)
 	T.check(settle(), "read"); T.eq(Market.List().by, "other", "somebody else's scan is read too")
-	T.eq(select(2, Market.CanScan()), "cooldown", "and counts for the game's limit")
+	T.eq(Market.CanScan(), true, "ours stays offered: a browse scan has no 15-minute limit")
 	-- DaylightMogul owning the house also frees our own read
 	w.settings.AuctionHouse.enabled = true
 	T.eq(select(2, Market.CanScan()), "dui", "Daylight UI's house back in use")
@@ -359,6 +335,21 @@ T.case("our own read: only when allowed, once in 15 minutes", function()
 	local offered, reason = Market.CanScan()
 	T.eq(offered, false, "no scan of ours is offered beside DaylightMogul's"); T.eq(reason, "other", "and the reason says so")
 	w.DUI.ahMogul = nil
+	-- another installed Auction House addon with a full scan: its scan is the way, not ours
+	T.eq(#Market.Others(true), 0, "no other scanner installed")
+	w.settings.AuctionHouse.enabled = false
+	T.eq(Market.CanScan(), true, "ours is offered")
+	w.addons.Auctionator = 0
+	T.eq(#Market.Others(true), 0, "installed but switched off for this character: not counted")
+	w.addons.Auctionator = 2
+	T.eq(Market.Others(true)[1], "Auctionator", "installed and on: counted")
+	offered, reason = Market.CanScan()
+	T.eq(offered, false, "no scan of ours beside it"); T.eq(reason, "other", "and the reason says so")
+	T.eq((Market.Scan()), false, "Scan refuses too")
+	w.addons = {}
+	Market.Others(true)
+	T.eq(Market.CanScan(), true, "gone again: ours is back")
+	w.settings.AuctionHouse.enabled = true
 end)
 
 T.case("the house key without Daylight UI's module", function()

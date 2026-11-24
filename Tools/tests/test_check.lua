@@ -8,6 +8,7 @@
 
 local w = T.world()
 w.load("Market.lua")
+w.load("Sweep.lua")
 w.load("Check.lua")
 rawset(_G, "UIParent", {})
 rawset(_G, "GameTooltip", {})

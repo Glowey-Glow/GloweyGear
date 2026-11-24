@@ -1,14 +1,18 @@
 ## Interface: 16001
-## Title: Glowey's |cff5fd38dGear|r (DaylightUI Plugin)
+## Title: Glowey's |cff5fd38dGear|r
 ## IconTexture: Interface\AddOns\GloweyGear\Media\icon.png
-## Notes: A plugin for Daylight UI: scores gear for your spec, compares it with what you wear and carry, and lists the best upgrades for sale on the Auction House by improvement per gold. The same verdict shows on item tooltips and bag slots.
+## Group: GloweyGear
+## Notes: Works on its own, and integrates with Daylight UI when it's installed (its options window, look and profiles). Scores gear for your spec, compares it with what you wear and carry, and lists the best upgrades for sale on the Auction House by improvement per gold. The same verdict shows on item tooltips and bag slots.
 ## Author: Glowey
 ## X-License: All Rights Reserved
 ## X-Curse-Project-ID: 1820197
 ## X-Credits: Some stat weights are derived from wowsims (MIT, Copyright (c) 2022 wowsims team): see CREDITS.md.
 ## Version: @project-version@
-## Dependencies: DaylightUI
-## SavedVariables: GloweyGearDB
+## OptionalDeps: DaylightUI
+## SavedVariables: GloweyGearDB, GloweyGearSettings
+# (The saved variables load before the files: Locales/Locales.lua reads the language picked in
+# Glowey's Plugins window as it loads.)
+## LoadSavedVariablesFirst: 1
 
 Locales\Locales.lua
 Locales\deDE.lua
@@ -17,6 +21,7 @@ Locales\esES.lua
 Locales\ruRU.lua
 Locales\koKR.lua
 Locales\zhCN.lua
+Host.lua
 Data\Weights.lua
 Data\Requirements.lua
 Game.lua
@@ -28,10 +33,12 @@ Rank.lua
 Update.lua
 Guide.lua
 GearGuide.lua
+MyWeights.lua
 Core.lua
 TipFallback.lua
 Marks.lua
 Market.lua
+Sweep.lua
 Check.lua
 Window.lua
 Quest.lua

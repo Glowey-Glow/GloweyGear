@@ -395,6 +395,12 @@ function T.world()
 	def("geterrorhandler", function() return function(err) error(err, 0) end end)
 	def("GetLocale", function() return "enUS" end)
 	def("UnitName", function() return "Tester" end)
+	-- the addon list: w.addons[folder] = enable state (0 off, 2 on); missing = not installed
+	w.addons = {}
+	def("C_AddOns", {
+		DoesAddOnExist = function(name) return w.addons[name] ~= nil end,
+		GetAddOnEnableState = function(name) return w.addons[name] or 0 end,
+	})
 	def("GetRealmName", function() return "Test Realm" end)
 	def("UnitFactionGroup", function() return "Alliance" end)
 	def("issecretvalue", false)
@@ -441,6 +447,86 @@ function T.world()
 		end,
 		HasFullItemSearchResults = function(key) return (ah.results[key.itemID] or {}).full ~= false end,
 		IsThrottledMessageSystemReady = function() return ah.ready end,
+		-- Browse searches (Sweep.lua): ah.browse = { { itemID, suffix, level, price, own, qty,
+		-- classID, subClassID, inv }, ... } is what the house holds; a query gets the rows its
+		-- itemClassFilters match, ah.page at a time, each page answered ah.delay seconds later
+		-- (ah.silent: never). ah.samples["id:suffix"] = a sample link. SendSearchQuery answers
+		-- with ITEM_SEARCH_RESULTS_UPDATED (the rows in ah.results) unless ah.searchSilent.
+		SendBrowseQuery = function(query)
+			ah.calls.browse = ah.calls.browse + 1
+			ah.queries[#ah.queries + 1] = query
+			local match = {}
+			for _, r in ipairs(ah.browse) do
+				for _, f in ipairs(query.itemClassFilters or {}) do
+					if f.classID == r.classID and (f.subClassID == nil or f.subClassID == r.subClassID)
+						and (f.inventoryType == nil or f.inventoryType == r.inv) then
+						match[#match + 1] = r
+						break
+					end
+				end
+			end
+			local cur = { match = match, at = 0, given = {} }
+			ah.cur = cur
+			local function page()
+				local added = {}
+				for i = cur.at + 1, math.min(#match, cur.at + ah.page) do
+					local r = match[i]
+					local info = { itemKey = { itemID = r.itemID, itemLevel = r.level or 0, itemSuffix = r.suffix or 0,
+						battlePetSpeciesID = 0 }, minPrice = r.price, totalQuantity = r.qty or 1, containsOwnerItem = r.own == true }
+					added[#added + 1] = info
+					cur.given[#cur.given + 1] = info
+				end
+				cur.at = math.min(#match, cur.at + ah.page)
+				return added
+			end
+			cur.page = page
+			if ah.silent then return end
+			C_Timer.After(ah.delay, function()
+				if ah.cur ~= cur then return end
+				page()
+				w.fire("AUCTION_HOUSE_BROWSE_RESULTS_UPDATED")
+			end)
+		end,
+		GetBrowseResults = function() return ah.cur and ah.cur.given or {} end,
+		HasFullBrowseResults = function() return not ah.cur or ah.cur.at >= #ah.cur.match end,
+		RequestMoreBrowseResults = function()
+			ah.calls.more = ah.calls.more + 1
+			local cur = ah.cur
+			if not cur or ah.silent then return end
+			C_Timer.After(ah.delay, function()
+				if ah.cur ~= cur then return end
+				w.fire("AUCTION_HOUSE_BROWSE_RESULTS_ADDED", cur.page())
+			end)
+		end,
+		GetItemKeySampleLink = function(k) return ah.samples[k.itemID .. ":" .. (k.itemSuffix or 0)] end,
+		GetItemKeyRequiredLevel = function() return 12 end,
+		SendSearchQuery = function(k)
+			ah.calls.search = ah.calls.search + 1
+			if ah.searchSilent then return end
+			C_Timer.After(ah.delay, function() w.fire("ITEM_SEARCH_RESULTS_UPDATED", k) end)
+		end,
+	})
+	ah.browse, ah.page, ah.delay, ah.samples, ah.queries = {}, 3, 0.1, {}, {}
+	ah.calls.browse, ah.calls.more, ah.calls.search = 0, 0, 0
+	def("hooksecurefunc", function(t, name, fn)
+		local orig = t[name]
+		t[name] = function(...)
+			local r = { orig(...) }
+			fn(...)
+			return unpack(r)
+		end
+	end)
+	def("Enum", {
+		ItemClass = { Weapon = 2, Armor = 4 },
+		ItemWeaponSubclass = { Axe1H = 0, Axe2H = 1, Bows = 2, Guns = 3, Mace1H = 4, Mace2H = 5, Polearm = 6, Sword1H = 7,
+			Sword2H = 8, Staff = 10, Unarmed = 13, Generic = 14, Dagger = 15, Thrown = 16, Crossbow = 18, Wand = 19 },
+		ItemArmorSubclass = { Generic = 0, Cloth = 1, Leather = 2, Mail = 3, Plate = 4, Shield = 6, Libram = 7, Idol = 8, Totem = 9 },
+		InventoryType = { IndexHeadType = 1, IndexNeckType = 2, IndexShoulderType = 3, IndexChestType = 5, IndexWaistType = 6,
+			IndexLegsType = 7, IndexFeetType = 8, IndexWristType = 9, IndexHandType = 10, IndexFingerType = 11,
+			IndexTrinketType = 12, IndexCloakType = 16, IndexRobeType = 20, IndexHoldableType = 23 },
+		AuctionHouseFilter = { PoorQuality = 4, CommonQuality = 5, UncommonQuality = 6, RareQuality = 7, EpicQuality = 8,
+			LegendaryQuality = 9, ArtifactQuality = 10 },
+		AuctionHouseSortOrder = { Price = 0, Name = 1, Level = 2, Bid = 3, Buyout = 4 },
 	})
 
 	-- Daylight UI

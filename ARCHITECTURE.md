@@ -31,12 +31,13 @@ Load order is the `.toc`'s.
 | `Data\Weights.lua`, `Data\README.md` | Stat weights, generated; pure table (`Tools\data\gen.py`, `extract.py`, `check.py`, `upstream.json`) | 1105 | `test_data.lua` |
 | `Game.lua` | Every game call the engine makes | 311 | `test_game.lua` |
 | `Stats.lua` | Link to normalized stat record; link identity; effects not counted | 479 | `test_stats.lua` |
-| `Spec.lua` | Data check, spec from talents, weights by level | 298 | `test_spec.lua`, `test_data.lua` |
+| `Spec.lua` | Data check, spec from talents, weights by level; the player's own weights laid over them (`Spec.Effective`) | 298 | `test_spec.lua`, `test_data.lua` |
 | `Score.lua` | Weighted sum; who can wear what; dual wield | 164 | `test_score.lua` |
 | `Compare.lua` | What a candidate replaces; best of worn and carried; the percent | 318 | `test_compare.lua` |
 | `Rank.lua` | Scoring job in slices; filter, order, group | 198 | `test_rank.lua` |
 | `Update.lua`, `Guide.lua` | Shared with the owner's other plugins (newer-version alert, PREFIX `GloweyGear`; tours, welcome, What's New, `ns.Pad`). Never edited here | 135, 900 | |
 | `GearGuide.lua` | This plugin's welcome, tour and What's New | 105 | `test_marks.lua` |
+| `MyWeights.lua` | The player's own stat weights: sparse overrides per class and spec in `GloweyGearDB.weights`, the Stat Weights options page (a grid of number boxes in one custom row, each with a revert arrow; sliders where the host takes no custom rows; Revert This Spec / Revert Every Spec) | 809 | `test_core.lua`, `test_spec.lua` |
 | `Core.lua` | Settings, saved variables, bus, events, who and owned caches, verdicts, `/gear`, registration, options page | 575 | `test_core.lua` |
 | `Marks.lua` | Tooltip row and bag corner mark | 495 | `test_marks.lua` |
 | `Market.lua` | Gear for sale: reads the replicate list, saves it per house | 811 | `test_market.lua` |
@@ -314,7 +315,7 @@ An item with a count above 0 is marked: the tooltip gets one more line, "Gear Ad
 - **Weapon pairs across the Auction House:** a main hand and an off hand that are only an upgrade when bought together are not found. (A one-hand weapon is tried in both hands for a dual wielder; shields and held items against the off hand.)
 - **Weapon speed** (no language-free source), **hit cap**, **talents**.
 - **Class-restricted and profession-only gear** can be suggested wrongly (no table ships; `C_PlayerInfo.CanUseItem` is a game check). The class table of who can train which weapon and armor type is written by hand (single source).
-- A second followed spec; custom weights; other addons' weights; quest rewards; chat alerts; vendor-value rules; the overlap dialog for Pawn, Forever Leveling BiS, Polestar and CheapUpgrades.
+- A second followed spec; custom weights (built later: `MyWeights.lua`); other addons' weights; quest rewards; chat alerts; vendor-value rules; the overlap dialog for Pawn, Forever Leveling BiS, Polestar and CheapUpgrades.
 - The bank and other characters do not count as owned; no `RegisterUpgradePlugin` (the bag search word "upgrade").
 - A stat table the game answered incompletely once is kept for the session (audit L4): the game gives no sign that a table is partial, so there is nothing to test for.
 

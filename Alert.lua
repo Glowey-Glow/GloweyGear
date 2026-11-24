@@ -17,7 +17,8 @@
 --   * one line at a time, the biggest news; never two lines within QUIET seconds (news found
 --     inside that minute is kept and said when it is over);
 --   * nothing after a change of Max Price, Smallest Gain to Show, Only My Best Armor Type, the
---     level or what is worn and carried: those change the picks with nothing new for sale;
+--     level, the player's own stat weights or what is worn and carried: those change the picks
+--     with nothing new for sale;
 --   * never in a fight (nothing is remembered then either, so the news keeps);
 --   * off with the Chat Alert switch, and with Show Gear Advice.
 -- What is remembered is per character: GloweyGearDB.chars[guid].seen =
@@ -111,7 +112,9 @@ function Alert.Check(view, owned)
 	-- the options that filter the list, and what is owned. A change of any of them makes the
 	-- next look a silent one (the picks are only remembered).
 	local under = table.concat({ tostring(ns.Get("maxPrice")), tostring(ns.Get("minGain")), tostring(ns.Get("bestArmor")),
-		tostring(who.level), tostring(owned) }, "|")
+		tostring(who.level), tostring(owned),
+		-- (and the player's own stat weights: MyWeights.lua)
+		ns.MyWeights and ns.MyWeights.Signature(who.class, who.spec) or "" }, "|")
 	local seen = type(c.seen) == "table" and c.seen or nil
 	if seen and (seen.house ~= house or seen.spec ~= who.spec or seen.mode ~= mode or seen.under ~= under) then seen = nil end
 	local news, slots = Alert.News(seen and seen.slots or nil, view, mode)

@@ -58,6 +58,7 @@ end
 -- ---- load: the locale table, the real weights, the engine (already in NS), then Core ----------
 run("Locales/Locales.lua", NS)
 run("Data/Weights.lua", NS)
+run("MyWeights.lua", NS)
 run("Core.lua", NS)
 
 T.case("it registers as a Daylight UI plugin", function()
@@ -85,7 +86,7 @@ end)
 T.case("every options row is one Daylight UI accepts", function()
 	local def = registered.module.def
 	local defaults, pages = def.defaults, def.options.pages
-	T.eq(#pages, 1, "one page"); T.eq(pages[1].id, "gear", "its id")
+	T.eq(#pages, 2, "two pages"); T.eq(pages[1].id, "gear", "its id"); T.eq(pages[2].id, "weights", "and Stat Weights")
 	T.check(type(pages[1].desc) == "string" and not pages[1].desc:find("\n"), "a one-line description")
 	local known = { toggle = true, slider = true, dropdown = true, color = true, button = true, text = true }
 	local rows = 0
@@ -505,6 +506,263 @@ T.case("what our own code costs is counted, and /gear debug says it", function()
 	T.check(all:find("longest frame of our own work in the last minute, by part (ms): market 2.4, scoring 0.0", 1, true), "the longest frame by part:\n" .. all)
 	T.check(all:find("refreshes", 1, true) and all:find("reads of what is owned", 1, true) and all:find("paints", 1, true), "how often things happened")
 	T.check(all:find("120 item-data (2 a second)", 1, true), "item-data events a second")
+end)
+
+-- ---- the player's own stat weights (MyWeights.lua) ------------------------------------------
+local function weightRows()
+	local page = registered.module.def.options.pages[2]
+	local rows, byLabel = {}, {}
+	for _, group in ipairs(page.groups) do
+		for _, item in ipairs(group.items) do
+			rows[#rows + 1] = item
+			local label = type(item.label) == "string" and item.label or "(text)"
+			byLabel[label] = item
+		end
+	end
+	return page, rows, byLabel
+end
+
+-- The rules Daylight UI's registry applies to a page's rows (Options/Registry.lua:56-110), and that
+-- Host.lua draws them; returns how many sliders and custom rows the page has.
+local function checkRows(rows)
+	local known = { toggle = true, slider = true, dropdown = true, button = true, text = true, custom = true }
+	local sliders, customs = 0, 0
+	for _, item in ipairs(rows) do
+		local at = tostring(item.label)
+		T.check(known[item.type], at .. ": a known row type")
+		if item.type == "text" then
+			T.eq(type(item.label), "function", "the status line is worked out when drawn")
+		elseif item.type == "custom" then
+			customs = customs + 1
+			T.eq(item.label, "", "the grid: an empty label, as Daylight UI's own custom rows have")
+			T.check(type(item.build) == "function" and type(item.update) == "function" and type(item.height) == "function",
+				"the grid: build, update and height")
+		else
+			T.check(type(item.label) == "string" and item.label ~= "", at .. ": a label")
+		end
+		T.check(item.desc == nil or type(item.desc) == "string", at .. ": desc is text")
+		if item.type == "slider" then
+			sliders = sliders + 1
+			T.check(type(item.get) == "function" and type(item.set) == "function" and type(item.default) == "function",
+				at .. ": get, set and default (Daylight UI's reset arrow)")
+			T.check(type(item.min) == "number" and type(item.max) == "number" and item.min < item.max and item.step > 0, at .. ": a range")
+			T.eq(item.unit, nil, at .. ": no unit (Daylight UI takes only %, px and x)")
+		elseif item.type == "toggle" or item.type == "dropdown" then
+			T.check(type(item.get) == "function" and type(item.set) == "function", at .. ": get and set together")
+		elseif item.type == "button" then
+			T.eq(item.confirm, true, at .. ": asks first"); T.check(type(item.func) == "function", at .. ": does something")
+		end
+	end
+	return sliders, customs
+end
+
+T.case("the Stat Weights page has only rows Daylight UI and Host.lua draw", function()
+	local page, rows = weightRows()
+	T.check(type(page.desc) == "string" and not page.desc:find("\n") and #page.desc <= 70, "a one-line description")
+	local sliders, customs = checkRows(rows)
+	T.eq(customs, 0, "no grid on a host that does not say it takes one (Host.CustomRows)")
+	T.eq(sliders, #NS.MyWeights.LIST, "one slider for every stat the editor knows")
+	for _, s in ipairs(NS.MyWeights.LIST) do
+		T.check(NS.Stats.KEYS[s[1]], s[1] .. " is a stat the scorer reads")
+		T.check(not s[1]:find("_SPEED$"), "speeds are left out: nothing reads them yet")
+	end
+end)
+
+T.case("own weights: set, scored, shown, reverted", function()
+	T.reset()
+	GloweyGearDB = nil
+	WORLD.class, WORLD.level = "WARRIOR", 60
+	WORLD.trees = { { name = "Arms", spent = 31 }, { name = "Fury", spent = 20 }, { name = "Protection", spent = 0 } }
+	dui("Login")
+	for _ = 1, 8 do tick() end
+	local _, rows, by = weightRows()
+	local status
+	for _, item in ipairs(rows) do if item.type == "text" then status = item end end
+	local str, hit, armor = by["Strength"], by["Hit, per 1%"], by["Armor, per 100"]
+	T.check(str and hit and armor, "rows for Strength, Hit (per 1%) and Armor (per 100)")
+	local rec = NS.Spec.Weights("WARRIOR", "ARMS", 60)
+	local who = NS.Who()
+	T.eq(who.spec, "ARMS", "scoring Arms"); T.eq(who.custom, 0, "with no weights of the player's own")
+	T.eq(who.weights, rec, "the recommendation's own table")
+	T.near(hit.get(), rec.HIT, "a slider shows the recommendation"); T.near(hit.default(), rec.HIT, "which is its default")
+	T.eq(str.hidden(), false, "a stat the spec weights is listed")
+	T.eq(by["Fire Resistance"].hidden(), true, "one it leaves at nothing is not")
+	by["Show Every Stat"].set(true)
+	T.eq(by["Fire Resistance"].hidden(), false, "Show Every Stat lists it")
+	by["Show Every Stat"].set(false)
+	T.check(status.label():find("Every weight for Arms is Glowey's recommendation.", 1, true), "the status line: " .. status.label())
+	T.check(by["Revert This Spec"].disabled(), "nothing to revert yet"); T.check(by["Revert Every Spec"].disabled(), "anywhere")
+
+	-- set two weights
+	hit.set(12)
+	T.eq(GloweyGearDB.weights.WARRIOR.ARMS.HIT, 12, "saved under class and spec, only the stat set")
+	T.eq(GloweyGearDB.weights.WARRIOR.ARMS.STR, nil, "the rest are not written")
+	who = NS.Who()
+	T.eq(who.custom, 1, "scored at once with one of the player's own"); T.eq(who.weights.HIT, 12, "the player's number")
+	T.eq(who.weights.STR, rec.STR, "the others stay the recommendation's")
+	T.check(who.weights ~= rec, "a table of its own"); T.check(rec.HIT ~= 12, "the shipped data is not changed")
+	T.eq(NS.Who().weights, who.weights, "the same table until something changes")
+	armor.set(1)   -- shown per 100 armor
+	T.near(GloweyGearDB.weights.WARRIOR.ARMS.ARMOR, 0.01, "Armor is saved per point")
+	T.near(armor.get(), 1, "and shown per 100")
+	T.check(status.label():find("Your own weights for Arms: Hit, Armor.", 1, true), "the status line names them: " .. status.label())
+	local fired = 0
+	NS.On("WhoChanged", function() fired = fired + 1 end)
+	tick()
+	T.check(fired >= 1, "the others hear WhoChanged after the change, to score again")
+
+	-- level: the player's number stands, the rest slide
+	WORLD.level = 30
+	NS.WeightsChanged(); tick()
+	who = NS.Who()
+	T.eq(who.weights.HIT, 12, "a weight set by hand is used at every level")
+	T.near(who.weights.STA, NS.Spec.Weights("WARRIOR", "ARMS", 30).STA, "the others follow the recommendation for the level")
+	WORLD.level = 60
+	NS.WeightsChanged(); tick()
+
+	-- back on the recommendation by value: no longer the player's own
+	hit.set(rec.HIT)
+	T.eq(GloweyGearDB.weights.WARRIOR.ARMS.HIT, nil, "set back to the recommendation, it is dropped")
+	T.check(not by["Revert This Spec"].disabled(), "Armor still to revert")
+	-- 0 is a real choice
+	str.set(0)
+	T.eq(GloweyGearDB.weights.WARRIOR.ARMS.STR, 0, "a 0 is kept"); T.eq(NS.Who().weights.STR, 0, "and scored as worth nothing")
+
+	str.set(rec.STR)
+	T.eq(GloweyGearDB.weights.WARRIOR.ARMS.STR, nil, "back on the recommendation")
+	T.eq(by["Revert One Stat"], nil, "no Revert One Stat dropdown: each box has its own revert arrow")
+
+	-- another spec
+	local edit = by["Spec to Edit"]
+	T.eq(edit.get(), "ARMS", "the editor opens on the spec being scored")
+	T.check(edit.values.FURY ~= nil and edit.values.auto == nil, "it lists the class's specs, not Auto")
+	edit.set("FURY")
+	T.near(hit.get(), NS.Spec.Weights("WARRIOR", "FURY", 60).HIT, "the sliders show Fury's")
+	hit.set(3)
+	T.eq(GloweyGearDB.weights.WARRIOR.FURY.HIT, 3, "Fury's own")
+	T.eq(NS.Who().spec, "ARMS", "editing Fury does not change the spec scored")
+	T.near(NS.Who().weights.HIT, rec.HIT, "nor Arms' weights")
+
+	-- revert this spec (Fury), then every spec
+	by["Revert This Spec"].func()
+	T.eq(GloweyGearDB.weights.WARRIOR.FURY, nil, "Fury is the recommendation again")
+	T.check(GloweyGearDB.weights.WARRIOR.ARMS ~= nil, "Arms keeps its own")
+	edit.set("ARMS")
+	T.check(not by["Revert Every Spec"].disabled(), "something to revert")
+	by["Revert Every Spec"].func()
+	T.eq(next(GloweyGearDB.weights), nil, "every spec is the recommendation again")
+	who = NS.Who()
+	T.eq(who.custom, 0, "scored with the recommendation"); T.eq(who.weights, NS.Spec.Weights("WARRIOR", "ARMS", 60), "its own table")
+	T.check(by["Revert Every Spec"].disabled(), "nothing left to revert")
+
+	-- a broken saved value is never scored
+	GloweyGearDB.weights = { WARRIOR = { ARMS = { HIT = "lots", STR = -2, NOT_A_STAT = 4, CRIT = 9 } } }
+	NS.WeightsChanged()
+	who = NS.Who()
+	T.eq(who.custom, 1, "only the good one counts"); T.eq(who.weights.CRIT, 9, "it")
+	T.eq(who.weights.HIT, NS.Spec.Weights("WARRIOR", "ARMS", 60).HIT, "a word is not a weight")
+	T.eq(who.weights.NOT_A_STAT, nil, "an unknown key is left out")
+	GloweyGearDB.weights = {}
+	NS.WeightsChanged(); tick()
+end)
+
+T.case("Stat Weights as a grid of boxes: what a box takes, saves and shows", function()
+	local MW = NS.MyWeights
+	-- typed numbers: 0 or more, up to four decimals, a comma as the decimal mark
+	local good = { ["12"] = 12, ["0.55"] = 0.55, [".5"] = 0.5, ["5."] = 5, ["1,25"] = 1.25, [" 3 "] = 3,
+		["0"] = 0, ["1.2345"] = 1.2345, ["0000.1"] = 0.1 }
+	for text, want in pairs(good) do T.near(MW.Parse(text), want, "takes '" .. text .. "'") end
+	for _, text in ipairs({ "", " ", ".", "-1", "+2", "1.23456", "abc", "1.2.3", "1e3", "0x10", "1,2,3", "inf", "nan", "12a" }) do
+		T.eq(MW.Parse(text), nil, "refuses '" .. text .. "'")
+	end
+	T.eq(MW.Parse(nil), nil, "refuses nothing")
+	T.eq(MW.Format(0.55), "0.55", "shows 0.55"); T.eq(MW.Format(1), "1", "1 without decimals")
+	T.eq(MW.Format(12.5), "12.5", "no trailing zeros"); T.eq(MW.Format(100), "100", "100 keeps its zeros")
+	T.eq(MW.Format(0), "0", "0"); T.eq(MW.Format(0.12344), "0.1234", "at most four decimals")
+
+	-- columns: as many as fit, two-line labels at most, the shortest grid
+	T.eq(MW.Columns(900, 20, function() return 1 end), 3, "a wide page: three columns")
+	T.eq(MW.Columns(560, 20, function() return 1 end), 2, "Host.lua's window width: two")
+	T.eq(MW.Columns(200, 20, function() return 1 end), 1, "a narrow one: one")
+	T.eq(MW.Columns(520, 20, function(i, w) return (i % 5 == 0 and w < 200) and 2 or 1 end), 2,
+		"a few labels on two lines still beat one long column")
+	T.eq(MW.Columns(900, 20, function(_, w) return w < 400 and 3 or 1 end), 1,
+		"never a label on three lines when fewer columns keep it shorter")
+
+	-- a page on a host that takes custom rows (Host.CustomRows): the grid, the sliders behind it
+	local oldHost, oldApi = NS.Host, NS.API
+	NS.Host = { CustomRows = function() return true end }
+	NS.API = setmetatable({ Input = function() end }, { __index = oldApi })
+	local page = MW.Page()
+	local rows, grid, sliders = {}, nil, {}
+	for _, group in ipairs(page.groups) do
+		for _, item in ipairs(group.items) do
+			rows[#rows + 1] = item
+			if item.type == "custom" then grid = item end
+			if item.type == "slider" then sliders[#sliders + 1] = item end
+		end
+	end
+	local nSliders, customs = checkRows(rows)
+	T.eq(customs, 1, "one grid row"); T.eq(nSliders, #MW.LIST, "the sliders stay, as a fallback")
+	T.eq(grid.noSearch, nil, "custom rows are never searched anyway (Registry.lua:443)")
+	T.reset()
+	GloweyGearDB = nil
+	WORLD.class, WORLD.level = "WARRIOR", 60
+	WORLD.trees = { { name = "Arms", spent = 31 }, { name = "Fury", spent = 20 }, { name = "Protection", spent = 0 } }
+	dui("Login")
+	for _ = 1, 8 do tick() end
+	T.eq(grid.hidden(), false, "the grid shows")
+	for _, s in ipairs(sliders) do T.eq(s.hidden(), true, s.label .. ": its slider is put away") end
+	T.check(not page.groups[1].items[4].label:find("Revert One"), "no Revert One Stat row")
+	-- a host without custom rows (Daylight UI before 2.2.5): no grid, the sliders
+	NS.Host = { CustomRows = function() return false end }
+	local plain = MW.Page()
+	for _, item in ipairs(plain.groups[1].items) do T.check(item.type ~= "custom", "no grid without custom rows") end
+	T.eq(sliders[1].hidden(), false, "the sliders are back")
+	NS.Host, NS.API = oldHost, oldApi
+	MW.Page()   -- (as Core registered it)
+
+	-- what a box saves
+	local rec = NS.Spec.Weights("WARRIOR", "ARMS", 60)
+	local shown, mine = MW.Display("HIT")
+	T.eq(shown, MW.Format(rec.HIT), "a box shows the recommendation"); T.eq(mine, false, "plain, not the player's own")
+	T.eq(MW.Commit("HIT", "12"), true, "12 is taken")
+	T.eq(GloweyGearDB.weights.WARRIOR.ARMS.HIT, 12, "and saved for the edited spec")
+	shown, mine = MW.Display("HIT")
+	T.eq(shown, "12", "the box shows it"); T.eq(mine, true, "as the player's own (the accent, the revert arrow)")
+	T.eq(NS.Who().weights.HIT, 12, "and it is scored")
+	for _, bad in ipairs({ "abc", "-3", "1.23456", "" }) do
+		T.eq(MW.Commit("HIT", bad), false, "'" .. bad .. "' is refused")
+		T.eq(GloweyGearDB.weights.WARRIOR.ARMS.HIT, 12, "and the weight stays")
+	end
+	T.eq(MW.Commit("HIT", "12.0"), true, "the same number again"); T.eq(GloweyGearDB.weights.WARRIOR.ARMS.HIT, 12, "changes nothing")
+	T.eq(MW.Commit("HIT", MW.Format(rec.HIT)), true, "the recommendation's own number")
+	T.eq(GloweyGearDB.weights.WARRIOR, nil, "puts the stat back on the recommendation")
+	T.eq(MW.Commit("ARMOR", "0.1234"), true, "four decimals, per 100 armor")
+	T.near(GloweyGearDB.weights.WARRIOR.ARMS.ARMOR, 0.001234, "saved per point with nothing lost")
+	T.eq((MW.Display("ARMOR")), "0.1234", "and shown per 100 as typed")
+	T.eq(MW.Commit("STR", "0"), true, "0 is a weight"); T.eq(GloweyGearDB.weights.WARRIOR.ARMS.STR, 0, "kept as 0")
+	T.eq(MW.Commit("STR", "1,5"), true, "a comma works as the decimal mark"); T.near(GloweyGearDB.weights.WARRIOR.ARMS.STR, 1.5, "1.5")
+	T.eq(MW.Commit("NOT_A_STAT", "1"), false, "an unknown stat is refused")
+	MW.RevertAll()
+	tick()
+end)
+
+T.case("/gear says when the player's own weights are in use", function()
+	NS.MyWeights.Set("WARRIOR", "ARMS", "CRIT", 20)
+	tick()
+	DEFAULT_CHAT_FRAME.lines = {}
+	local open = NS.OpenWindow
+	NS.OpenWindow = nil
+	commands.gear.fn("")
+	T.check(DEFAULT_CHAT_FRAME.lines[1]:find("with your own stat weights", 1, true), "says so: " .. tostring(DEFAULT_CHAT_FRAME.lines[1]))
+	local printed = {}
+	print = function(...) printed[#printed + 1] = table.concat({ ... }, " ") end
+	commands.gear.fn("debug")
+	T.check(table.concat(printed, "\n"):find("your own weights: CRIT 20", 1, true), "debug lists them")
+	NS.MyWeights.RevertAll()
+	tick()
+	NS.OpenWindow = open
 end)
 
 return T.done()

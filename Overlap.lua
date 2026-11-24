@@ -335,7 +335,10 @@ local function DaylightBusy()
 	return false
 end
 
+-- (Host.Ink: painted again after a look change.)
 local function Ink(fs, role)
+	local H = ns.Host
+	if type(H) == "table" and type(H.Ink) == "function" then return H.Ink(fs, role) end
 	local ok, colors = pcall(API.Colors)
 	local c = ok and type(colors) == "table" and colors[role]
 	if type(c) == "table" then fs:SetTextColor(c[1], c[2], c[3]) end
@@ -357,7 +360,9 @@ local function Build()
 	f:SetScript("OnDragStart", f.StartMoving)
 	f:SetScript("OnDragStop", f.StopMovingOrSizing)
 	f:Hide()
-	API.Skin(f, { window = true })
+	-- (Host.Skin: dressed again after a look change.)
+	local H = ns.Host
+	if type(H) == "table" and type(H.Skin) == "function" then H.Skin(f, { window = true }) else API.Skin(f, { window = true }) end
 	f:HookScript("OnShow", function() SetBusy(true) end)
 	f:HookScript("OnHide", function() SetBusy(false) end)
 	if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "GloweyGearOverlap") end

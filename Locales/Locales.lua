@@ -19,12 +19,42 @@
 -- Tools/locales.py checks that every key the code uses has a line in every language, that no
 -- line is left over, and that the format holes match.
 
-local _, ns = ...
+local ADDON, ns = ...
 
-ns.LOCALE = GetLocale and GetLocale() or "enUS"
-if ns.LOCALE == "enGB" then ns.LOCALE = "enUS" end
-if ns.LOCALE == "esMX" then ns.LOCALE = "esES" end
-local ENGLISH = ns.LOCALE:sub(1, 2) == "en"
+-- The language of the addon's own text, ns.LOCALE: Daylight UI's own pick while it runs (its Home >
+-- Language, since 2.2.5), else the Language picked on the General page of Glowey's Plugins window
+-- (Host.lua), else the game's. One of the seven there are files for; enGB reads enUS, esMX esES.
+-- The game's own words (GAME below, ns.GameText) stay in the game's language.
+local CLIENT = GetLocale and GetLocale() or "enUS"
+local FOLD = { enGB = "enUS", esMX = "esES" }
+local HAVE = { enUS = true, deDE = true, esES = true, frFR = true, ruRU = true, koKR = true, zhCN = true }
+local function Picked()
+	local D = rawget(_G, "DaylightUI")
+	if type(D) == "table" and type(D.API) == "table" and D.API.major == 1 then
+		-- (Its pick is on from its own ADDON_LOADED, which comes before any addon loading after it:
+		-- DaylightUI/Locales/Locales.lua:16-20, Core.lua:984-992. Its saved pick, should it not be.)
+		local pick = D.LOCALE
+		local db = rawget(_G, "DaylightUIDB")
+		local saved = type(db) == "table" and db.language
+		if type(saved) == "string" and saved ~= "auto" and pick == D.CLIENT_LOCALE then pick = saved end
+		return pick
+	end
+	-- (Kept in every Glowey addon's <Addon>Settings, the newest counting. Ours can be read this early
+	-- because the .toc loads the saved variables first: LoadSavedVariablesFirst.)
+	local best, at
+	local own = rawget(_G, ADDON .. "Settings")
+	if type(own) == "table" and type(own.general) == "table" then best, at = own.general.language, own.generalAt or 0 end
+	local host = rawget(_G, "GloweyHost")
+	local S = type(host) == "table" and host.state
+	if type(S) == "table" and type(S.general) == "table" and (S.generalAt or -1) >= (at or -1) then best = S.general.language end
+	return best
+end
+local pick = Picked()
+pick = type(pick) == "string" and (FOLD[pick] or pick) or nil
+ns.LOCALE = (pick and HAVE[pick]) and pick or (FOLD[CLIENT] or CLIENT)
+-- ENGLISH: the game's words don't stand in for ours (an English game, or our text picked in another
+-- language than the game's).
+local ENGLISH = CLIENT:sub(1, 2) == "en" or ns.LOCALE ~= (FOLD[CLIENT] or CLIENT)
 
 -- Keys whose English is word for word one of the game's global strings, in the same sense: on a
 -- non-English client the game's own translation stands in for ours, which stays as the fallback

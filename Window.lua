@@ -24,7 +24,10 @@
 -- without it, the game's own) is up and Dock to the Auction House is on, it sits flush against that window's right edge (the
 -- left one when the right has no room), tops level, and follows it; a small tab at that corner
 -- folds it away. Anywhere else /gear opens it as a window of its own that is dragged by
--- its body and remembers its place.
+-- its body and remembers its place (Host.Spot: with Daylight UI in the player's profile). On its
+-- own it also takes part in Daylight UI's window room (Host.Window: other windows slide aside for
+-- it) and takes Daylight UI's global scale (Host.Scaled); beside the Auction House it does neither,
+-- and takes the Auction House window's scale instead.
 --
 -- A CLICK on a row (A on a controller) searches that item in Daylight UI's Buy page. Nothing
 -- is ever bought, bid on or posted from here.
@@ -50,7 +53,6 @@
 --
 -- luacheck: read globals CreateFrame UIParent C_Timer C_Item GameTooltip ITEM_QUALITY_COLORS
 -- luacheck: read globals GetMoneyString geterrorhandler GetServerTime
--- luacheck: globals UISpecialFrames
 
 local ADDON, ns = ...
 if ns.off or not ns.ok then return end
@@ -192,7 +194,7 @@ end
 -- What to say instead of rows, or nil when there are rows. facts:
 --   enabled, who (bool), whoWhy, fight (nothing scored yet and a fight is on),
 --   market ("none" | "reading" | "ready"), hasList, done, total, dui (Daylight UI's Auction House
---   is the one in use), scoring (bool), left, listed, over (copper | nil), money(copper) -> text
+--   is the one in use), other (the names of the addons whose full scan is the way, or nil), scoring (bool), left, listed, over (copper | nil), money(copper) -> text
 function Window.EmptyState(f)
 	if f.enabled == false then return "off", L["Gear advice is switched off in the options."] end
 	if not f.who then
@@ -208,10 +210,14 @@ function Window.EmptyState(f)
 			end
 			return "asking", L["Waiting for the Auction House's list."]
 		end
+		if f.sweep then return "sweeping", Window.SweepText(f.sweep) end
 		if f.dui then
 			return "nolist", L["No list of the Auction House yet. Run a Full scan there, and the upgrades show up here."]
 		end
-		return "nolistown", L["No list of the Auction House yet. Open the Auction House and press Read the Auction House."]
+		if f.other then
+			return "nolistother", L["No list of the Auction House yet. Run a full scan in %s, and the upgrades show up here."]:format(f.other)
+		end
+		return "nolistown", L["No list of the Auction House yet. Open the Auction House and press Scan the Auction House."]
 	end
 	if (f.listed or 0) > 0 then return nil end
 	if f.fight then return "fight", L["Gear isn't checked during a fight. The list fills in when it ends."] end
@@ -221,6 +227,25 @@ function Window.EmptyState(f)
 		return "over", L["No upgrades for sale under your max price. Raise it to %s to see one."]:format(money(f.over))
 	end
 	return "nothing", L["No upgrades for sale right now."]
+end
+
+-- What our own scan is doing (Sweep.Progress), in words, and how far it is (0 to 1).
+function Window.SweepText(p)
+	if not p then return "", 0 end
+	local part = (p.total or 0) > 0 and math.min(1, (p.done or 0) / p.total) or 0
+	if p.paused then
+		if p.closed then
+			return L["Scan paused: the Auction House closed. Open it and press Resume Scan."], part
+		end
+		return L["Scan paused. Press Resume Scan to go on."], part
+	end
+	if p.step == "browse" then
+		return L["Scanning weapons and armor: %d of %d categories, %d items found."]:format(p.done or 0, p.total or 0,
+			p.found or 0), part
+	elseif p.step == "search" then
+		return L["Checking rolled items: %d of %d."]:format(p.done or 0, p.total or 0), part
+	end
+	return L["Saving the scan."], part
 end
 
 -- Where the window is: beside the Auction House (shown or folded to its tab), on its own, or away.
@@ -638,6 +663,16 @@ end)
 ns.On("WhoChanged", function() Dirty(true) end)
 ns.On("OwnedChanged", function() Dirty(false) end)
 ns.On("MarketChanged", function() Dirty(false) end)
+-- Our own scan: started, paused or ended lays the window out again; its progress only moves the
+-- bar and the words, twice a second at most.
+ns.On("SweepChanged", function() if Shown() then Paint() end end)
+ns.On("SweepProgress", function()
+	if not Shown() then return end
+	local now = Game.Clock()
+	if now - (S.sweepTold or 0) < PROGRESS_MS then return end
+	S.sweepTold = now
+	Window.PaintProgress()
+end)
 ns.On("MarketProgress", function(done)
 	if not Shown() then return end
 	-- Told every frame while a list is read, from inside the reader's own slice of the frame.
@@ -712,6 +747,38 @@ local function SearchInDui(name)
 	return (pcall(page.Submit, name, true))
 end
 
+-- The game's own Auction House window: the name in its search bar and the search started, as
+-- its own search button does (Blizzard_AuctionHouseUI, branch forever:
+-- Shared\Blizzard_AuctionHouseSearchBar.lua:203-207 StartSearch, :195 SetSearchText). From Sell or
+-- Auctions it goes to the Buy tab first (Shared\Blizzard_AuctionHouseFrame.lua:541
+-- SetDisplayMode, which also picks the tab), and a category picked there is let go
+-- (Shared\Blizzard_AuctionHouseCategoriesList.lua:148), so the item is found in any category.
+local BUY_MODES = { "Buy", "ItemBuy", "CommoditiesBuy" }
+local function SearchInGame(name)
+	local f = GameHost()
+	if not f then return false end
+	local bar = f.SearchBar
+	if type(bar) ~= "table" or type(bar.SetSearchText) ~= "function" or type(bar.StartSearch) ~= "function" then
+		return false
+	end
+	local modes = rawget(_G, "AuctionHouseFrameDisplayMode")
+	if type(modes) == "table" and type(f.SetDisplayMode) == "function" then
+		local buying = false
+		for _, mode in ipairs(BUY_MODES) do
+			if modes[mode] ~= nil and f.displayMode == modes[mode] then buying = true end
+		end
+		if not buying and modes.Buy ~= nil and not pcall(f.SetDisplayMode, f, modes.Buy) then return false end
+	end
+	if type(f.GetCategoriesList) == "function" then
+		local ok, list = pcall(f.GetCategoriesList, f)
+		if ok and type(list) == "table" and type(list.SetSelectedCategory) == "function" then
+			pcall(list.SetSelectedCategory, list, nil)
+		end
+	end
+	if not pcall(bar.SetSearchText, bar, name) then return false end
+	return (pcall(bar.StartSearch, bar))
+end
+
 local Money
 ns.Money = function(copper) return Money(copper) end
 Money = function(copper)
@@ -735,8 +802,8 @@ end
 
 local function Pad() return type(ns.Pad) == "table" and ns.Pad or nil end
 
--- The search for a row's item. True when Daylight UI took it. With an Auction House open that
--- we could not hand it to (the game's own window, DaylightMogul's, or a Daylight UI that
+-- The search for a row's item. True when Daylight UI's Auction House or the game's own took it.
+-- With an Auction House open that we could not hand it to (DaylightMogul's, or a window that
 -- changed), the player is told what to type; away from an Auction House a click only selects.
 function Window.Search(row)
 	local text = Window.SearchText(row)
@@ -748,6 +815,7 @@ function Window.Search(row)
 		if ns.Check and id then ns.Check.One(id) end
 		return true
 	end
+	if SearchInGame(text) then return true end
 	if ns.Market.IsOpen() then
 		ns.Print(L["Type %s in the Auction House's search box."]:format(text))
 	end
@@ -755,12 +823,74 @@ function Window.Search(row)
 end
 
 -- =============================================================================================
--- Saved state: GloweyGearDB.window = { folded = bool, x =, y = } (per account)
+-- Saved state: GloweyGearDB.window = { folded = bool } (per account); the spot on its own in the
+-- plugin's settings (Spot below)
 -- =============================================================================================
 local function Saved()
 	local db = ns.DB()
 	if type(db.window) ~= "table" then db.window = {} end
 	return db.window
+end
+
+-- Host.lua's calls (ns.Host, both modes): true and what it answered, or false when it is not there
+-- (the offline tests load no Host.lua).
+local function HostCall(name, ...)
+	local H = ns.Host
+	local fn = type(H) == "table" and H[name]
+	if type(fn) ~= "function" then return false end
+	return true, fn(...)
+end
+
+-- The window shown and hidden through Host.Open / Close (its fade and sounds, and the window
+-- room), else straight; Up: shown and not closing (Host.Shown), for the toggle.
+local function ShowWin(f) if not HostCall("Open", f) then f:Show() end end
+local function HideWin(f) if not HostCall("Close", f) then f:Hide() end end
+local function Up(f)
+	local ok, v = HostCall("Shown", f)
+	if ok then return v and true or false end
+	return f:IsShown() == true
+end
+
+-- A role's color from the look (Host.Color), else the color given.
+local function Rgb(role, r, g, b)
+	local ok, called, r2, g2, b2 = pcall(HostCall, "Color", role)
+	if ok and called and type(r2) == "number" then return r2, g2, b2 end
+	return r, g, b
+end
+
+-- The window's spot on its own: its top left in UIParent units, { x =, y = }. Host.Spot keeps it
+-- in the plugin's settings, so with Daylight UI in the player's profile, as Daylight UI's own
+-- windows' spots are; the spot saved before (GloweyGearDB.window.x / y) is moved in once.
+local Spot = {}
+function Spot.Host()
+	if Spot.s == nil then
+		local ok, s = HostCall("Spot", "window", {
+			get = function()
+				local w = Saved()
+				if type(w.x) == "number" and type(w.y) == "number" then return { x = w.x, y = w.y } end
+				return nil
+			end,
+			clear = function()
+				local w = Saved()
+				w.x, w.y = nil, nil
+			end,
+		})
+		Spot.s = ok and type(s) == "table" and s or false
+	end
+	return Spot.s or nil
+end
+function Spot.Get()
+	local s = Spot.Host()
+	local t = s and s.Get() or nil
+	if type(t) ~= "table" then t = Saved() end
+	if type(t.x) == "number" and type(t.y) == "number" then return t.x, t.y end
+	return nil
+end
+function Spot.Save(x, y)
+	local s = Spot.Host()
+	if s and s.Save({ x = x, y = y }) ~= false then return end
+	local w = Saved()
+	w.x, w.y = x, y
 end
 
 -- =============================================================================================
@@ -802,20 +932,25 @@ local function RowEnter(self)
 	-- come with it.)
 	if e.row.isSet then
 		-- The pair's own row: what it is, in words.
-		GameTooltip:SetText(L["Both Together"], 1, 1, 1)
-		GameTooltip:AddLine(L["Buying these two together is a bigger upgrade than either one alone."], 0.72, 0.70, 0.66, true)
-		GameTooltip:AddDoubleLine(HandName("MAINHAND"), e.row.main.name or "", 0.72, 0.70, 0.66, QualityColor(e.row.main.quality))
-		GameTooltip:AddDoubleLine(HandName("OFFHAND"), e.row.off.name or "", 0.72, 0.70, 0.66, QualityColor(e.row.off.quality))
+		-- (The look's roles, Host.Color: the title in TITLE, the words and hands in LABEL; the
+		-- items' names keep their quality's color.)
+		local tr, tg, tb = Rgb("TITLE", 1, 1, 1)
+		local lr, lg, lb = Rgb("LABEL", 0.72, 0.70, 0.66)
+		GameTooltip:SetText(L["Both Together"], tr, tg, tb)
+		GameTooltip:AddLine(L["Buying these two together is a bigger upgrade than either one alone."], lr, lg, lb, true)
+		GameTooltip:AddDoubleLine(HandName("MAINHAND"), e.row.main.name or "", lr, lg, lb, QualityColor(e.row.main.quality))
+		GameTooltip:AddDoubleLine(HandName("OFFHAND"), e.row.off.name or "", lr, lg, lb, QualityColor(e.row.off.quality))
 		GameTooltip:Show()
 		return
 	end
 	if not pcall(GameTooltip.SetHyperlink, GameTooltip, e.row.link) then return GameTooltip:Hide() end
 	-- (A price a search confirmed since the scan says so, and how long ago.)
 	local checked = Window.CheckedText(e.row.checkedAt)
-	if checked then GameTooltip:AddLine(checked, 0.72, 0.70, 0.66, true) end
+	local lr, lg, lb = Rgb("LABEL", 0.72, 0.70, 0.66)
+	if checked then GameTooltip:AddLine(checked, lr, lg, lb, true) end
 	-- (With the tooltip row switched off, the "*" still gets its words.)
 	if ns.Get("tooltips") == false and Window.Uncounted(e.row) then
-		GameTooltip:AddLine(L["Gear Advice does not count this item's special effect."], 0.72, 0.70, 0.66, true)
+		GameTooltip:AddLine(L["Gear Advice does not count this item's special effect."], lr, lg, lb, true)
 	end
 	-- (Only Daylight UI's window takes the search: beside the game's own, a click says what to type.)
 	if DuiHost() then
@@ -951,7 +1086,13 @@ local function Facts()
 	local who, whoWhy = ns.Who()
 	local state, done, total = ns.Market.State()
 	local _, why = ns.Market.CanScan()
+	local other
+	if why == "other" then
+		local names = ns.Market.Others()
+		other = #names > 0 and table.concat(names, ", ") or "Daylight Mogul"
+	end
 	return {
+		other = other, sweep = ns.Sweep and ns.Sweep.Progress() or nil,
 		enabled = ns.Get("enabled") ~= false, who = who ~= nil, whoWhy = whoWhy,
 		market = state, done = done, total = total, hasList = ns.Market.Saved() ~= nil, dui = why == "dui",
 		fight = S.job == nil and Game.InCombat(),
@@ -972,7 +1113,9 @@ local function SubText(facts)
 	local parts = {}
 	local who = ns.Who()
 	if who then
-		parts[1] = L["Scoring gear for %s, level %d."]:format(ns.SpecValues[who.spec] or who.spec, who.level)
+		-- (Saying so when the player's own stat weights are in use: MyWeights.lua.)
+		parts[1] = ((who.custom or 0) > 0 and L["Scoring gear for %s, level %d, with your own stat weights."]
+			or L["Scoring gear for %s, level %d."]):format(ns.SpecValues[who.spec] or who.spec, who.level)
 	end
 	if facts.market == "reading" and facts.hasList then
 		if (facts.total or 0) > 0 then
@@ -1071,9 +1214,19 @@ local function LayoutFoot(f, C)
 	else
 		f.check:Hide()
 	end
-	-- Our own read of the Auction House: only where Daylight UI's Full Scan is not the way.
+	-- Our own scan of the Auction House: only where neither Daylight UI's Full Scan nor another
+	-- installed addon's full scan is the way (Market.CanScan). While one runs or waits to go on,
+	-- its bar and words stand above the button.
 	local ok, why = ns.Market.CanScan()
-	if ok or why == "cooldown" or why == "busy" then
+	local p = ns.Sweep and ns.Sweep.Progress()
+	if ok or why == "busy" or p then
+		local label = L["Scan the Auction House"]
+		if p and p.paused then
+			label = L["Resume Scan"]
+		elseif p then
+			label = L["Stop Scan"]
+		end
+		f.scan.text:SetText(label)
 		f.scan:ClearAllPoints()
 		f.scan:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -EDGE, y)
 		f.scan.FitWidth(120)
@@ -1081,6 +1234,21 @@ local function LayoutFoot(f, C)
 		y = y + 28
 	else
 		f.scan:Hide()
+	end
+	if p then
+		f.bar:ClearAllPoints()
+		f.bar:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", EDGE, y + 2)
+		f.bar:SetSize(INNER, 6)
+		f.bar:Show()
+		f.barText:ClearAllPoints()
+		f.barText:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", EDGE, y + 12)
+		f.barText:SetWidth(INNER)
+		ink(f.barText, C.LABEL)
+		Window.PaintBar(f, p)
+		y = y + 16 + math.ceil(f.barText:GetStringHeight() or 12)
+	else
+		f.bar:Hide()
+		f.barText:Hide()
 	end
 	local mode = ns.Get("mode") == "biggest" and "biggest" or "perGold"
 	f.mode.text:SetText(MODES[mode])
@@ -1108,7 +1276,12 @@ function Window.Thumb()
 	local f = Window.frame
 	if not f then return end
 	local range, listH = f.range or 0, f.listH or 0
-	if range <= 0 or listH <= 0 then return f.thumb:Hide() end
+	local H = ns.Host
+	if range <= 0 or listH <= 0 then
+		f.thumb:Hide()
+		if H and H.ScrollArt then H.ScrollArt(f.thumb, f.scroll, 4) end
+		return
+	end
 	local h = math.max(16, listH * listH / (listH + range))
 	local at = math.max(0, math.min(range, f.scroll:GetVerticalScroll() or 0)) / range * (listH - h)
 	f.thumb:SetColorTexture(1, 1, 1, 0.18)
@@ -1116,6 +1289,8 @@ function Window.Thumb()
 	f.thumb:ClearAllPoints()
 	f.thumb:SetPoint("TOPRIGHT", f.scroll, "TOPRIGHT", -3, -at)
 	f.thumb:Show()
+	-- (Blizzard Style without Daylight UI: the minimal scroll bar round it, its own color hidden.)
+	if H and H.ScrollArt and H.ScrollArt(f.thumb, f.scroll, 4) then f.thumb:SetAlpha(0) else f.thumb:SetAlpha(1) end
 end
 
 local painting = false
@@ -1203,10 +1378,21 @@ end
 
 -- Only the sentence about the reading, where it stands now (the line under the title, or the
 -- text that stands in for an empty list).
+-- The scan's bar and words, set in place (no layout).
+function Window.PaintBar(f, p)
+	if not p then return end
+	local text, part = Window.SweepText(p)
+	f.bar:SetMinMaxValues(0, 1)
+	f.bar:SetValue(part)
+	f.barText:SetText(text)
+	f.barText:Show()
+end
+
 function Window.PaintProgress()
 	local f = Window.frame
 	if not f or not f:IsShown() then return end
 	local facts = Facts()
+	if facts.sweep and f.bar:IsShown() then Window.PaintBar(f, facts.sweep) end
 	f.sub:SetText(SubText(facts))
 	local key, text = Window.EmptyState(facts)
 	if key and f.empty:IsShown() then f.empty:SetText(text) end
@@ -1234,12 +1420,17 @@ local function SetMode(mode)
 end
 
 local function ScanClick()
-	local ok, why, left = ns.Market.Scan()
-	if ok or why == "busy" then return Paint() end
-	if why == "cooldown" then
-		ns.Print(L["You can read the Auction House again in %d min."]:format(math.max(1, math.ceil((left or 0) / 60))))
-	elseif why == "throttled" then
-		ns.Print(L["The Auction House isn't taking requests right now. Try again in a moment."])
+	if ns.Sweep and ns.Sweep.Running() then
+		ns.Sweep.Pause()
+		return Paint()
+	end
+	local ok, why = ns.Market.Scan()
+	if not ok then
+		if why == "closed" then
+			ns.Print(L["Open the Auction House to scan it."])
+		elseif why == "noapi" then
+			ns.Print(L["This game client doesn't let addons search the Auction House."])
+		end
 	end
 	Paint()
 end
@@ -1247,6 +1438,10 @@ end
 -- The fold tab: a small bordered tab with a grip, at the top corner of the side the window
 -- hangs from (on the window's outer edge while it is open, on the host's while folded).
 local function PaintGrip(t, hover)
+	-- (Host.Tint: the grip follows a look change as well, in LABEL, or the accent on hover.)
+	local tinted = true
+	for i = 1, 3 do tinted = HostCall("Tint", t.bars[i], hover and "pop" or "LABEL", 1) and tinted end
+	if tinted then return end
 	local r, g, b
 	if hover then
 		r, g, b = API.Accent()
@@ -1262,7 +1457,8 @@ local function BuildTab()
 	t:SetSize(14, 34)
 	t:SetFrameStrata("MEDIUM")
 	t:Hide()
-	pcall(API.Skin, t, { noBevel = true })
+	-- (Host.Skin: dressed again after a look change.)
+	if not HostCall("Skin", t, { noBevel = true }) then pcall(API.Skin, t, { noBevel = true }) end
 	t.bars = {}
 	for i = 1, 3 do
 		local bar = t:CreateTexture(nil, "OVERLAY")
@@ -1279,9 +1475,12 @@ local function BuildTab()
 	end)
 	t:SetScript("OnEnter", function(self)
 		PaintGrip(self, true)
-		GameTooltip:SetOwner(self, tipSide())
-		GameTooltip:SetText(Saved().folded and L["Show Upgrades for Sale"] or L["Hide Upgrades for Sale"])
-		GameTooltip:Show()
+		local title = Saved().folded and L["Show Upgrades for Sale"] or L["Hide Upgrades for Sale"]
+		if not HostCall("Tip", self, title, nil, nil, tipSide()) then
+			GameTooltip:SetOwner(self, tipSide())
+			GameTooltip:SetText(title)
+			GameTooltip:Show()
+		end
 	end)
 	t:SetScript("OnLeave", function(self)
 		PaintGrip(self, false)
@@ -1322,6 +1521,8 @@ local function Build()
 	f.title:SetText(L["Upgrades for Sale"])
 	f.close = API.Close(f, function() Window.Close() end)
 	f.close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -8)
+	-- Blizzard Style without Daylight UI: a titled window, the X up in its title bar (Host.Chrome).
+	if ns.Host and ns.Host.Chrome then ns.Host.Chrome(f, { title = "Glowey's Gear", close = f.close }) end
 	f.sub = API.Text(f, "small", "LEFT")
 	f.sub:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -4)
 	f.sub:SetWordWrap(true)
@@ -1363,17 +1564,33 @@ local function Build()
 	f.check = API.Button(f, L["Check Prices"], 22)
 	f.check:SetScript("OnClick", CheckClick)
 	f.check:SetScript("OnEnter", function(self)
+		local text = L["Searches the Auction House for each item shown, to see what it costs now and whether it is still for sale."]
+		if HostCall("Tip", self, nil, text, nil, "ANCHOR_TOP") then return end
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText(L["Searches the Auction House for each item shown, to see what it costs now and whether it is still for sale."], 1, 1, 1, 1, true)
+		GameTooltip:SetText(text, 1, 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
 	f.check:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	f.check:Hide()
-	f.scan = API.Button(f, L["Read the Auction House"], 22)
+	f.scan = API.Button(f, L["Scan the Auction House"], 22)
 	f.scan:SetScript("OnClick", ScanClick)
+	f.scan:SetScript("OnEnter", function(self)
+		local text = L["Goes through every weapon and armor category of the Auction House, page by page, at the pace the game allows. Keep the Auction House open until it finishes: closing it pauses the scan."]
+		if HostCall("Tip", self, nil, text, nil, "ANCHOR_TOP") then return end
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText(text, 1, 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	f.scan:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	f.scan:Hide()
+	f.bar = API.Bar and API.Bar(f) or CreateFrame("StatusBar", nil, f)
+	f.bar:Hide()
+	f.barText = API.Text(f, "small", "LEFT")
+	f.barText:SetWordWrap(true)
+	f.barText:Hide()
 
-	-- Dragged by its body while it stands alone; its place is kept (UIParent units).
+	-- Dragged by its body while it stands alone; its place is kept (UIParent units). Anchored
+	-- again by one point (the window room slides only a window with one, DaylightUI\Windows\n	-- Feel.lua:116-127), and the room is told its new home (Host.Moved).
 	f:SetScript("OnDragStart", function(self)
 		if S.mode == "free" then self:StartMoving() end
 	end)
@@ -1382,9 +1599,12 @@ local function Build()
 		if S.mode ~= "free" then return end
 		local left, top = self:GetLeft(), self:GetTop()
 		if left and top then
-			local saved = Saved()
-			saved.x, saved.y = left * self:GetScale(), top * self:GetScale()
+			local k = self:GetScale() or 1
+			Spot.Save(left * k, top * k)
+			self:ClearAllPoints()
+			self:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
 		end
+		HostCall("Moved", self)
 	end)
 	f:SetScript("OnShow", function()
 		if S.stale then
@@ -1397,7 +1617,7 @@ local function Build()
 	end)
 	-- Hidden by something else than Place (Escape): standing alone it is closed; beside the
 	-- Auction House it is folded, so the next frame does not bring it straight back.
-	-- Hidden by the game (Escape, while it stands alone: Special below): it is closed.
+	-- Hidden by the game while it stands alone: it is closed.
 	f:SetScript("OnHide", function(self)
 		-- (Hidden along with the whole interface it is still "shown": nothing to remember.)
 		if S.placing or self:IsShown() then return end
@@ -1418,35 +1638,40 @@ local function Build()
 	f.padTabsLabel = L["Best Pick"]
 	f.padFirst = function() return f.first or f.minus end
 	f.padSelect = function(stop)
-		if type(stop) == "table" and stop.entry and DuiHost() then return L["Search"] end
+		if type(stop) == "table" and stop.entry and (DuiHost() or GameHost()) then return L["Search"] end
 		return nil
 	end
+	-- (Followed here, before Host.Window, so B still folds it beside the Auction House: Host.Window
+	-- then leaves the controller to this, frame.__gloweyFollowed. Escape there is the Auction
+	-- House window's, below.)
 	local P = Pad()
 	if P then
 		P.Follow(f, function() Window.Close() end)
 		P.Stick(f, f.scroll)
 	end
+	-- Host.Window: Escape, the open and close sounds and fade, and on its own Daylight UI's window
+	-- room (other windows slide aside for it). Escape closes it only while it stands alone: beside
+	-- the Auction House the key belongs to that window (Daylight UI's takes it itself, DaylightUI\n	-- Windows\Keys.lua:30-41; in a fight the game's Escape closes both together, Blizzard_
+	-- UIParentPanelManager CloseAllWindows), and a fold there would be kept for the next visit.
+	-- Docked, it takes no part in the room (room() false) and never Daylight UI's scale (Scaled:
+	-- docked() true): it takes the Auction House window's own (Place).
+	HostCall("Window", f, {
+		close = function() if S.mode == "free" and not S.loose then Window.Close() end end,
+		room = function() return S.dockK == nil end,
+	})
+	HostCall("Scaled", f, {
+		own = function() return S.dockK or 1 end,
+		docked = function() return S.dockK ~= nil end,
+	})
 
 	Window.frame = f
 	Window.tab = BuildTab()
-	return f
-end
-
--- Escape closes the window while it stands alone: its name is on the game's list of such
--- windows (UISpecialFrames) only then. Beside the Auction House it is not: there Escape belongs
--- to that window (Daylight UI's takes the key itself: DaylightUI\Windows\Keys.lua:30-41; in a
--- fight the key goes to the game, and a panel that swallowed it would keep the Auction House
--- from closing).
-local function Special(on)
-	local list = UISpecialFrames
-	if type(list) ~= "table" then return end
-	for i = #list, 1, -1 do
-		if list[i] == "GloweyGearWindow" then
-			if on then return end
-			table.remove(list, i)
-		end
+	-- (A look change grows or drops Blizzard Style's frame round the window: docked, it is placed
+	-- again so that frame stays flush with the Auction House window.)
+	if ns.Host and ns.Host.Looked then
+		ns.Host.Looked(Window, function() if S.mode == "docked" or S.mode == "tab" then Place() end end)
 	end
-	if on then list[#list + 1] = "GloweyGearWindow" end
+	return f
 end
 
 -- Puts the window and its tab where the mode says. Our frames are never protected, so this is
@@ -1473,46 +1698,66 @@ Place = function()
 	else
 		S.loose = nil
 	end
+	local before = S.mode
 	S.mode, S.side = mode, side
 	S.placing = true
-	Special(mode == "free" and not S.loose)
 	if mode == "docked" or mode == "tab" then
 		local k = host:GetEffectiveScale() / UIParent:GetEffectiveScale()
-		f:SetScale(k)
+		-- (The Auction House window's scale, never Daylight UI's on top: Host.Scaled's docked().)
+		S.dockK = k
+		if not HostCall("Rescale", f) then f:SetScale(k) end
 		tab:SetScale(k)
 		-- (Beside the Auction House it never takes the controller's cursor as it shows.)
 		f.padSecond = true
+		-- (Blizzard Style draws its metal frame and title bar past the window's own edges
+		-- (Host.Outset): the frame's outer edge, not the window's, goes flush against the
+		-- Auction House window, tops level.)
+		local ol, or_, ot = 0, 0, 0
+		if ns.Host and ns.Host.Outset then ol, or_, ot = ns.Host.Outset(f) end
 		f:ClearAllPoints()
 		if side == "right" then
-			f:SetPoint("TOPLEFT", host, "TOPRIGHT", 0, 0)
+			f:SetPoint("TOPLEFT", host, "TOPRIGHT", ol, -ot)
 		else
-			f:SetPoint("TOPRIGHT", host, "TOPLEFT", 0, 0)
+			f:SetPoint("TOPRIGHT", host, "TOPLEFT", -or_, -ot)
 		end
-		f:SetShown(mode == "docked")
+		if mode == "docked" then ShowWin(f) else HideWin(f) end
 		local anchor = mode == "docked" and f or host
+		local reach = mode == "docked" and (side == "right" and or_ or ol) or 0
 		tab:ClearAllPoints()
 		if side == "right" then
-			tab:SetPoint("TOPLEFT", anchor, "TOPRIGHT", -1, -12)
+			tab:SetPoint("TOPLEFT", anchor, "TOPRIGHT", reach - 1, -12)
 		else
-			tab:SetPoint("TOPRIGHT", anchor, "TOPLEFT", 1, -12)
+			tab:SetPoint("TOPRIGHT", anchor, "TOPLEFT", 1 - reach, -12)
 		end
 		tab:Show()
 	elseif mode == "free" then
 		tab:Hide()
 		f.padSecond = nil
-		f:SetScale(1)
-		f:ClearAllPoints()
-		if type(saved.x) == "number" and type(saved.y) == "number" then
-			f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", saved.x, saved.y)
-		else
-			f:SetPoint("CENTER", UIParent, "CENTER", 320, 60)
+		S.dockK = nil
+		if not HostCall("Rescale", f) then f:SetScale(1) end
+		-- (Placed again only as it comes out on its own: one already out keeps a slide the window
+		-- room gave it.)
+		if before ~= "free" or not Up(f) then
+			f:ClearAllPoints()
+			local x, y = Spot.Get()
+			if x then
+				-- (The spot is in UIParent units; the offsets are in the window's own.)
+				local k = f:GetScale() or 1
+				f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / k, y / k)
+			else
+				f:SetPoint("CENTER", UIParent, "CENTER", 320, 60)
+			end
 		end
-		f:Show()
+		ShowWin(f)
 	else
 		tab:Hide()
-		f:Hide()
+		HideWin(f)
 	end
 	S.placing = false
+	-- (Docked or undocked while it is out: it leaves or joins Daylight UI's window room now.)
+	local docked = S.dockK ~= nil
+	if docked ~= S.wasDocked and f:IsShown() then HostCall("Moved", f) end
+	S.wasDocked = docked
 	if f:IsShown() then Paint() end
 end
 
@@ -1577,7 +1822,8 @@ function Window.Toggle()
 		if who then ns.Print(L["Scoring gear for %s, level %d."]:format(ns.SpecValues[who.spec] or who.spec, who.level)) end
 		return
 	end
-	if Shown() then Window.Close() else Window.Open() end
+	-- (Closing, it still says it's shown: Up asks whether it is going.)
+	if Window.frame and Up(Window.frame) then Window.Close() else Window.Open() end
 end
 ns.OpenWindow = Window.Toggle
 

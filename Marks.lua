@@ -602,6 +602,9 @@ function Marks.Register()
 	if registered then return end
 	registered = true
 	Colors()
+	-- (And again after every look change, Host.OnStyle: the rows are written from COLOR each time.)
+	local H = ns.Host
+	if type(H) == "table" and type(H.OnStyle) == "function" then H.OnStyle(Colors) end
 	local me = ns.me
 	if me and type(me.AddTooltipLines) == "function" then
 		local ok, err = pcall(me.AddTooltipLines, "item", OnItemTooltip)
