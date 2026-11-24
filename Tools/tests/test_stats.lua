@@ -311,6 +311,17 @@ T.case("not loaded yet is 'pending', and is asked again", function()
 	T.eq(Stats.Of(link).stats.STA, 4, "read once loaded")
 	local unknown, reason = Stats.Of("item:999999")
 	T.eq(unknown, nil, "an item the game knows nothing of"); T.eq(reason, "pending", "is pending, not an error")
+	-- the item's data is in, and the stat call answers nothing: an item with no stats, not
+	-- waited for; an answer that cannot be believed still waits
+	local bare = T.item({ id = 801, equipLoc = "INVTYPE_TRINKET" })
+	local base = NS.Game.ItemStats
+	NS.Game.ItemStats = function() return nil, "secret" end
+	local none, still = Stats.Of(bare)
+	T.eq(none, nil, "unreadable: no record"); T.eq(still, "pending", "still pending")
+	NS.Game.ItemStats = function() return nil end
+	local rec = Stats.Of(bare)
+	NS.Game.ItemStats = base
+	T.check(rec ~= nil, "no stat table: a record"); T.eq(next(rec.stats), nil, "with no stats")
 end)
 
 T.case("what is not gear", function()

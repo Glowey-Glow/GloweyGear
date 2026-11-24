@@ -162,7 +162,7 @@ local function DuiHouseKey()
 	return nil
 end
 
-function Market.House()
+local function ReadHouse()
 	local key = DuiHouseKey()
 	if key then return key end
 	local faction = Game.Faction() or "Neutral"
@@ -171,6 +171,22 @@ function Market.House()
 	local realm = Game.Realm()
 	if realm then return realm .. "-" .. faction end
 	return nil
+end
+
+-- The key is asked for on every look at the saved list (several times a paint of the window),
+-- and reading it is two protected calls into Daylight UI's module: it is kept once known, and
+-- read again (Market.ForgetHouse) at login, on entering the world, when the game's rules change,
+-- when an addon loads (Daylight UI's module may come later) and when the Auction House opens.
+-- Not known yet (nil) is never kept.
+local houseKey
+function Market.House()
+	if houseKey then return houseKey end
+	houseKey = ReadHouse()
+	return houseKey
+end
+
+function Market.ForgetHouse()
+	houseKey = nil
 end
 
 -- ---------------------------------------------------------------------------------------------
@@ -1174,6 +1190,7 @@ end
 
 local function onShown()
 	open = true
+	houseKey = nil
 	local okN, name = pcall(UnitName, "player")
 	name = okN and plain(name) or nil
 	if type(name) == "string" then me = name end
@@ -1398,7 +1415,15 @@ function Market.Debug()
 	return out
 end
 
+-- (When the house key may have changed: see Market.House.)
+local houseFrame = CreateFrame("Frame")
+houseFrame:SetScript("OnEvent", function() houseKey = nil end)
+for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "GAME_RULES_CHANGED", "ADDON_LOADED" }) do
+	pcall(houseFrame.RegisterEvent, houseFrame, event)
+end
+
 ns.me.On("Login", function()
+	houseKey = nil
 	Market.Prune()
 	Market.Hook()
 end)

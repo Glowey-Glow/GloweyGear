@@ -1,5 +1,10 @@
 # Glowey's Gear
 
+## 1.1.1
+- A list read more than a day ago says it's stale ("Stale: List read 30 h ago."), so you know to scan again: auctions run 12, 24 or 48 hours and most are posted for 24, so by then most of it has sold or run out.
+- Smoother at the Auction House: Scan the Auction House reads each page of results over a few frames instead of all at once, moving the Max Price per Item or Smallest Gain to Show setting arranges the list once a frame (and not at all while the window is closed), and looting or sorting your bags no longer reads your gear again when no gear moved.
+- An owned item whose stats the game never gives (such as a trinket with only a Use effect) is now read as having no stats, instead of being waited for while every item loaded at the Auction House read your bags again. Rolled links learned by the scan that the house hasn't sold in 30 days are dropped, so the saved file no longer grows without end.
+
 ## 1.1.0
 - Blizzard Style: docked to the Auction House, the window's metal frame and title bar now sit flush against the Auction House window with the tops level, instead of overlapping it and riding above it.
 - With Daylight UI installed, the Upgrades for Sale window follows it more closely: its colors and tooltips change with Daylight UI's look, on its own it takes Daylight UI's scale, other windows slide aside for it, its place is kept in your Daylight UI profile, and it fades and plays Daylight UI's window sounds as it opens and closes. Beside the Auction House it keeps that window's size and leaves Escape to it. Without Daylight UI it does the same in the look you picked in /glowey, with the game's window sounds.

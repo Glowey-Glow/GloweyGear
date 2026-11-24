@@ -384,16 +384,28 @@ local function OwnedChanged()
 end
 
 -- Bag and equipment events come in bursts (a vendor run fires dozens): one refresh a moment
--- after the last of them, and never in a fight (it runs when the fight ends).
+-- after the last of them, and never in a fight (it runs when the fight ends). Most bursts move
+-- nothing that is gear (loot, reagents, a stack split): when the worn and carried gear reads the
+-- same as when the context was built (Compare.OwnedPrint) and no owned item that waited for its
+-- data has it now (Compare.Arrived), the context stands and nobody is told. force: something
+-- else the context depends on changed (the weapon skills).
 local DELAY = 0.3
-local waiting, afterFight = false, false
-local function Soon()
+local waiting, afterFight, forced = false, false, false
+local function Soon(force)
+	if force then forced = true end
 	if waiting then return end
 	waiting = true
 	C_Timer.After(DELAY, function()
 		waiting = false
 		if ns.Game.InCombat() then
 			afterFight = true
+			return
+		end
+		local must = forced
+		forced = false
+		if not must and context and context.print ~= nil and Compare.OwnedPrint() == context.print
+			and not Compare.Arrived(context) then
+			Perf.Count("ownedSame")
 			return
 		end
 		OwnedChanged()
@@ -403,7 +415,8 @@ end
 -- Item data arriving. At an Auction House these events come by the tens of thousands (the
 -- game sends one for every item anybody's code makes it load), so one event costs a counter
 -- and two tests here, and nothing else:
---   * what is owned is read again only when some owned item was still waiting for its data;
+--   * what is owned is read again only when some owned item was still waiting for its data,
+--     and then only when that item's data is in (Soon looks, a few calls, before building);
 --   * otherwise the others hear one "ItemsArrived" a second at most, which only Marks.lua uses,
 --     and only when a bag or tooltip answer of its own was waiting;
 --   * the window does not listen here at all: a list being scored hears about its own parked
@@ -496,7 +509,7 @@ local EVENTS = {
 	TRAIT_CONFIG_LIST_UPDATED = "who", TRAIT_CONFIG_UPDATED = "who", PLAYER_TALENT_UPDATE = "who",
 	ACTIVE_TALENT_GROUP_CHANGED = "who", PLAYER_LEVEL_UP = "who", PLAYER_ENTERING_WORLD = "who",
 	-- Weapon skills learned change what can be wielded (DOC SkillInfoDocumentation.lua:105).
-	SKILL_LINES_CHANGED = "owned",
+	SKILL_LINES_CHANGED = "skills",
 	-- Worn and carried: DOC PaperDollInfoDocumentation.lua:386, ContainerDocumentation.lua:677.
 	PLAYER_EQUIPMENT_CHANGED = "owned", BAG_UPDATE_DELAYED = "owned",
 	-- Item data arriving turns "pending" items into records (DOC ItemDocumentation.lua:1815).
@@ -518,6 +531,8 @@ frame:SetScript("OnEvent", function(_, event)
 		end)
 	elseif kind == "owned" then
 		Soon()
+	elseif kind == "skills" then
+		Soon(true)
 	elseif kind == "item" then
 		ItemArrived()
 	elseif kind == "fight" then

@@ -353,29 +353,33 @@ T.case("our own scan: only when allowed", function()
 end)
 
 T.case("the house key without Daylight UI's module", function()
+	-- (The key is kept once known, and read again when it may have changed: each step here
+	-- is such a change.)
+	local function house() Market.ForgetHouse(); return Market.House() end
 	local mod = w.ahmod
 	w.ahmod = nil
-	T.eq(Market.House(), "realm4407-Alliance", "the realm's number (from the GUID) and the faction")
+	T.eq(Market.House(), "US-PvE", "kept: no read until something says it may have changed")
+	T.eq(house(), "realm4407-Alliance", "the realm's number (from the GUID) and the faction")
 	T.eq(Market.DuiAH(), nil, "Daylight UI's Auction House is not reachable")
 	w.ahmod = { enabled = true, ns = { Ruleset = { Key = function() error("changed") end } } }
-	T.eq(Market.House(), "realm4407-Alliance", "an adapter that fails falls back")
+	T.eq(house(), "realm4407-Alliance", "an adapter that fails falls back")
 	-- the game gives no realm name (this client since 2026-11-20): the key does not change, and
 	-- two realms or two factions never share a house
 	WORLD.realm = ""
-	T.eq(Market.House(), "realm4407-Alliance", "an empty realm name changes nothing")
+	T.eq(house(), "realm4407-Alliance", "an empty realm name changes nothing")
 	WORLD.faction = "Horde"
-	T.eq(Market.House(), "realm4407-Horde", "the other faction is another house")
+	T.eq(house(), "realm4407-Horde", "the other faction is another house")
 	WORLD.guid = "Player-5555-0BADF00D"
-	T.eq(Market.House(), "realm5555-Horde", "another realm is another house")
+	T.eq(house(), "realm5555-Horde", "another realm is another house")
 	WORLD.realmID = 77
-	T.eq(Market.House(), "realm77-Horde", "the game's own realm number wins over the GUID's")
+	T.eq(house(), "realm77-Horde", "the game's own realm number wins over the GUID's")
 	WORLD.realmID, WORLD.guid = nil, nil
-	T.eq(Market.House(), nil, "no number and no name: nothing is saved rather than saved under a shared key")
+	T.eq(house(), nil, "no number and no name: nothing is saved rather than saved under a shared key")
 	WORLD.realm = "Test Realm"
-	T.eq(Market.House(), "Test Realm-Horde", "a name alone will do when there is no number")
+	T.eq(house(), "Test Realm-Horde", "a name alone will do when there is no number")
 	WORLD.guid, WORLD.faction = "Player-4407-00ABCDEF", "Alliance"
 	w.ahmod = mod
-	T.eq(Market.House(), "US-PvE", "back")
+	T.eq(house(), "US-PvE", "back")
 end)
 
 T.case("what is saved, and old houses pruned at login", function()

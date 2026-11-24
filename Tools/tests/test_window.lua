@@ -267,21 +267,26 @@ T.case("scoring in slices, then arranging again without scoring again", function
 	local model = Window.S.model
 	T.eq(#model, 2, "two slot rows"); T.eq(model[1].group, "HEAD", "in slot order"); T.eq(model[2].more, 1, "chest has one alternative")
 
-	-- the controls: arranged again, never scored again
+	-- the controls: arranged again, never scored again (once a frame, on the next one)
 	local stats, seen = WORLD.calls.ItemStats, job.seen
-	w.set("mode", "biggest")
+	local set = w.set
+	local function wset(path, value) set(path, value); w.frames(1) end
+	wset("mode", "biggest")
 	T.check(Window.S.job == job, "the same job after the mode switch")
 	T.eq(Window.S.view.groups.CHEST[1].name, "Big", "biggest gain first now")
-	w.set("maxPrice", 500)
+	wset("maxPrice", 500)
 	T.eq(Window.S.view.groups.CHEST[1].name, "Dear", "a higher max price lets the dear one in"); T.eq(Window.S.view.listed, 4, "four shown")
-	w.set("maxPrice", 0)
+	wset("maxPrice", 0)
 	T.eq(Window.S.view.listed, 4, "no limit: the same four")
-	w.set("minGain", 0)
+	wset("minGain", 0)
 	T.eq(Window.S.view.listed, 5, "no smallest gain: the tiny one too")
-	w.set("maxPrice", 1)
+	wset("maxPrice", 1)
 	T.eq(Window.S.view.listed, 2, "one gold: only the two cheapest")
 	T.eq(Window.EmptyState(Window.Facts()), nil, "rows to show")
-	w.set("minGain", 3); w.set("maxPrice", 0); w.set("mode", "perGold")
+	wset("minGain", 3); wset("maxPrice", 0); wset("mode", "perGold")
+	local arranged = NS.Perf.Sum("arrange")
+	set("maxPrice", 5); set("maxPrice", 6); set("maxPrice", 0); w.frames(1)
+	T.eq(NS.Perf.Sum("arrange") - arranged, 1, "a slider's burst of steps is one arrangement")
 	T.eq(job.seen, seen, "nothing was scored again"); T.eq(WORLD.calls.ItemStats, stats, "and no item was read again")
 	T.check(Window.S.job == job and not Window.S.running, "still the one finished job")
 

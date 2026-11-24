@@ -266,13 +266,14 @@ T.case("a job with rows that never resolve ends", function()
 	T.eq(job.gaveUp, 40, "every unanswered row given up, and counted"); T.eq(job.nParked, 0, "nothing parked")
 	T.eq(#job.rows, 1, "what could be read was")
 	T.eq(#WORLD.requested, 80, "each item asked for twice, no more")
-	-- an item the game has, whose stats never come: a few tries, then given up
+	-- an item the game has, whose stats never come readable: a few tries, then given up
+	-- (a plain nil for an item whose data is in is an item with no stats: test_stats.lua)
 	T.reset()
 	job = Rank.Job(world())
 	local odd = piece("INVTYPE_HEAD", 20)
 	WORLD.items[T_ident(odd)].raw = nil
 	local base = NS.Game.ItemStats
-	NS.Game.ItemStats = function() return nil end
+	NS.Game.ItemStats = function() return nil, "secret" end
 	job:Add(odd, GOLD)
 	rounds = 0
 	while not job:Done() and rounds < 100 do

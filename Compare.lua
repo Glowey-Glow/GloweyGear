@@ -6,9 +6,15 @@
 --        carried = { link, link, ... }                   what is in the bags
 --        opts    = { bestArmor = bool }
 --        ctx.pending = how many owned links the game had not loaded yet (build it again later)
+--        ctx.waiting = those links
 --        ctx.typical = what a worn piece is worth on average (see THE PERCENT below)
 --        ctx.dual    = the character can hold a weapon in the off hand
 --   Compare.FromGame(who, opts)               -> ctx    (worn and carried read through ns.Game)
+--        ctx.print   = Compare.OwnedPrint() as it read when the context was built
+--   Compare.OwnedPrint()                      -> a string naming every worn and carried piece
+--                                                of gear: the same string, the same context
+--   Compare.Arrived(ctx)                      -> true when an owned link ctx was waiting for
+--                                                reads now
 --   Compare.Evaluate(rec, ctx, opts, out)     -> out
 --        opts = { exclude = key }   leave one copy of this item out of what is owned: for a
 --                                   verdict on an item that is itself in the bags
@@ -237,7 +243,7 @@ function Compare.Context(who, worn, carried, opts)
 	local Stats, Score = ns.Stats, ns.Score
 	Score.Fresh()
 	local ctx = { class = who.class, level = who.level, weights = who.weights,
-		bestArmor = opts and opts.bestArmor or false, pools = {}, pending = 0, typical = 0,
+		bestArmor = opts and opts.bestArmor or false, pools = {}, pending = 0, waiting = {}, typical = 0,
 		wornRec = {} }
 	ctx.dual = Score.CanDualWield(ctx)
 	local pools = ctx.pools
@@ -253,7 +259,10 @@ function Compare.Context(who, worn, carried, opts)
 	local function own(link, slot)
 		local rec, why = Stats.Of(link)
 		if not rec then
-			if why == "pending" then ctx.pending = ctx.pending + 1 end
+			if why == "pending" then
+				ctx.pending = ctx.pending + 1
+				ctx.waiting[ctx.pending] = link
+			end
 			return
 		end
 		local group = GROUP_OF[rec.equipLoc]
@@ -328,13 +337,56 @@ function Compare.Context(who, worn, carried, opts)
 	return ctx
 end
 
-local wornBuf, bagBuf = {}, {}
-function Compare.FromGame(who, opts)
+-- What is worn and carried, read into the two buffers. Only gear is taken from the bags: an item
+-- whose kind the game knows at once (Game.ItemInstant by item ID, no wait on the server) and is
+-- not gear is passed over before its link is made, so a bag of reagents costs one call a slot.
+-- (An item of unknown kind is taken: Stats.Of decides, as it always did.)
+local wornBuf, bagBuf, printBuf = {}, {}, {}
+local function carriedGear(itemID)
+	local equipLoc = ns.Game.ItemInstant(itemID)
+	return equipLoc == nil or ns.Stats.GEAR[equipLoc] ~= nil
+end
+local function ReadOwned()
 	local G = ns.Game
 	for slot = 1, 18 do wornBuf[slot] = G.WornLink(slot) end
 	for i = #bagBuf, 1, -1 do bagBuf[i] = nil end
-	G.BagLinks(bagBuf)
-	return Compare.Context(who, wornBuf, bagBuf, opts)
+	G.BagLinks(bagBuf, carriedGear)
+end
+local function Print()
+	local n = 0
+	for slot = 1, 18 do
+		n = n + 1
+		printBuf[n] = wornBuf[slot] or ""
+	end
+	for i = 1, #bagBuf do
+		n = n + 1
+		printBuf[n] = bagBuf[i]
+	end
+	return table.concat(printBuf, ",", 1, n)
+end
+
+-- A burst of bag events (a vendor run, loot, a stack split) mostly moves things that are not
+-- gear: Core.lua builds the context again only when this string changed.
+function Compare.OwnedPrint()
+	ReadOwned()
+	return Print()
+end
+
+-- (Read, not kept: a link still waiting costs a few calls and nothing is cached for it.)
+function Compare.Arrived(ctx)
+	local waiting = ctx and ctx.waiting
+	for i = 1, waiting and #waiting or 0 do
+		local rec, why = ns.Stats.Read(waiting[i])
+		if rec or why ~= "pending" then return true end
+	end
+	return false
+end
+
+function Compare.FromGame(who, opts)
+	ReadOwned()
+	local ctx = Compare.Context(who, wornBuf, bagBuf, opts)
+	ctx.print = Print()
+	return ctx
 end
 
 -- The nth best owned entry of a group (pools are sorted best first), passing over one copy of

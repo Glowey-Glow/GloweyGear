@@ -453,10 +453,16 @@ function Stats.Read(link, key)
 	end
 	local name, quality, minLevel, sellPrice = G.ItemInfo(link)
 	if not name then return nil, "pending" end
-	local raw = G.ItemStats(link)
-	-- (No table at all means "not loaded yet"; an empty one is an item with no stats, such as a
-	-- trinket that only has a Use effect: a real record that scores zero.)
-	if not raw then return nil, "pending" end
+	local raw, unreadable = G.ItemStats(link)
+	-- (An empty table is an item with no stats, such as a trinket that only has a Use effect: a
+	-- real record that scores zero. So is no table at all for an item whose own data is in (its
+	-- name was just read): counted "pending", such an item was waited for for ever, and while
+	-- one owned piece waited every item event at an Auction House read the bags again. Only an
+	-- answer that cannot be believed (Game.ItemStats' reason) still waits.)
+	if not raw then
+		if unreadable then return nil, "pending" end
+		raw = {}
+	end
 
 	local stats, counted = Stats.Normalize(raw, equipLoc)
 	local speed = G.ItemSpeed(link)

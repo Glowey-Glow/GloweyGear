@@ -128,13 +128,20 @@ function Window.Over(view)
 	return best
 end
 
+-- A list read over a day ago is "Stale" (as Glowey's Recipes' prices, Calc.STALE): auctions run
+-- 12, 24 or 48 hours and most are posted for 24, so by then most of what the list was read from
+-- has sold or run out. Said in front of its age, so the player knows to scan again.
+Window.STALE = 24 * 3600
+
 function Window.AgeText(seconds)
 	seconds = tonumber(seconds)
 	if not seconds then return nil end
 	if seconds < 60 then return L["List read just now."] end
 	if seconds < 3600 then return L["List read %d min ago."]:format(math.floor(seconds / 60)) end
-	if seconds < 48 * 3600 then return L["List read %d h ago."]:format(math.floor(seconds / 3600)) end
-	return L["List read more than two days ago."]
+	local text = seconds < 48 * 3600 and L["List read %d h ago."]:format(math.floor(seconds / 3600))
+		or L["List read more than two days ago."]
+	if seconds >= Window.STALE then text = L["Stale: %s"]:format(text) end
+	return text
 end
 
 -- A gain in percent as it is written: whole from 10 up, one decimal below (Marks.lua's, when it
@@ -315,8 +322,11 @@ for _, group in ipairs(Compare.GROUPS) do SIG_GROUPS[#SIG_GROUPS + 1] = group en
 
 -- What a job's answers depend on besides the list: who is scored for and every owned item that
 -- counts. The same signature means the same answers, so only what was not loaded is read again.
+-- (Not how many owned items wait for their data: one that arrives joins a pool, and changes
+-- the signature there; one that waits changes no answer. Counted here, every arrival scored
+-- the whole list again.)
 local function Signature(ctx)
-	local parts = { tostring(ctx.class), tostring(ctx.level), tostring(ctx.bestArmor), tostring(ctx.pending) }
+	local parts = { tostring(ctx.class), tostring(ctx.level), tostring(ctx.bestArmor) }
 	for _, group in ipairs(SIG_GROUPS) do
 		local pool = ctx.pools[group]
 		if pool then
@@ -377,6 +387,7 @@ end
 -- The exact arrangement of everything found, and a paint. Cheap enough for a control change
 -- (it sorts only the upgrades, a few hundred to a few thousand rows), too dear for every tick.
 function Window.Rearrange()
+	S.rearrange = nil
 	local job = S.job
 	if job then
 		ns.Perf.Count("arrange")
@@ -538,6 +549,8 @@ function Window.Refresh(force)
 		return
 	end
 	ns.Perf.Count("job")
+	-- (A new job is arranged under the controls as they are now: nothing is left to rearrange.)
+	S.rearrange = nil
 	S.job, S.sig, S.list = Rank.Job(ctx, ns.RankOptions(ctx.level)), sig, list
 	S.view, S.model, S.ending = nil, {}, nil
 	S.feedAt = list and 1 or nil
@@ -688,9 +701,27 @@ ns.On("MarketProgress", function(done)
 	S.told = now
 	Window.PaintProgress()
 end)
+-- A control changed (Max Price, Smallest Gain, Best Pick): the list is arranged again, once a
+-- frame however many steps a slider took, and not at all while the window is away (the
+-- arrangement is made when it shows: S.rearrange).
+local rearrangeSoon = false
+local function RearrangeSoon()
+	S.rearrange = true
+	if not Shown() or rearrangeSoon then return end
+	rearrangeSoon = true
+	C_Timer.After(0, function()
+		rearrangeSoon = false
+		if S.rearrange and Shown() then
+			S.rearrange = nil
+			Window.Rearrange()
+		end
+	end)
+end
+Window.RearrangeSoon = RearrangeSoon
+
 ns.On("Setting", function(path)
 	if path == "maxPrice" or path == "minGain" or path == "mode" then
-		Window.Rearrange()
+		RearrangeSoon()
 	elseif path == "dock" then
 		Place()
 	elseif path == "bestArmor" or path == "enabled" then
@@ -1609,6 +1640,11 @@ local function Build()
 	f:SetScript("OnShow", function()
 		if S.stale then
 			Window.Refresh(S.force)
+			-- (A new job arranges itself; a job that stood is arranged for the controls moved.)
+			if S.rearrange then Window.Rearrange() end
+		elseif S.rearrange then
+			Window.Rearrange()
+			if S.running then Tick(0) end
 		else
 			Paint()
 			-- (A job that stood still while the window was away goes on.)

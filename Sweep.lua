@@ -76,7 +76,9 @@ local TUNE = {
 	QUIET = 2,           -- seconds without someone else's search before ours is sent again
 	TICK = 0.1,          -- seconds between two looks at what to send next
 	RESUME_S = 1800,     -- a paused scan older than this starts over instead
-	BUDGET_MS = 3,       -- time in one frame for making the saved strings at the end
+	BUDGET_MS = 3,       -- time in one frame for reading a page's results, and for making the
+	                     -- saved strings at the end
+	KEEP_DAYS = 30,      -- a learned rolled link not met for this long is dropped at login
 }
 Sweep.TUNE = TUNE
 
@@ -176,29 +178,70 @@ end
 -- ---------------------------------------------------------------------------------------------
 -- Links of rolled keys, learned and kept
 -- ---------------------------------------------------------------------------------------------
+-- Each is kept with the day it was last met (GloweyGearDB.aseen for the links, .d on a suffix's
+-- roll), so what the house no longer sells goes after KEEP_DAYS (Sweep.Prune, at login) instead
+-- of growing the saved file for ever.
+local s            -- the scan: nil, or see Start
+
 local function Learned()
 	local db = ns.DB()
 	if type(db.akeys) ~= "table" then db.akeys = {} end
 	if type(db.atails) ~= "table" then db.atails = {} end
-	return db.akeys, db.atails
+	if type(db.aseen) ~= "table" then db.aseen = {} end
+	return db.akeys, db.atails, db.aseen
+end
+
+-- Today, as a day number (the scan's own start: one clock read per scan, not one per result).
+local function Today()
+	return math.floor(((s and s.startedAt) or Market.Now()) / 86400)
 end
 
 -- A real link of one item with one suffix: kept for the item, and its roll for the suffix.
 local function Learn(id, suffix, key)
 	if suffix == 0 then return end
-	local keys, tails = Learned()
-	keys[id .. ":" .. suffix] = key
+	local keys, tails, seen = Learned()
+	local today = Today()
+	local p = id .. ":" .. suffix
+	keys[p], seen[p] = key, today
 	local idText = tostring(id)
 	if key:sub(1, #idText) ~= idText then return end
 	local tail = key:sub(#idText + 1)
 	if tail == "" then return end
 	local t = tails[suffix]
 	if type(t) ~= "table" then
-		tails[suffix] = { t = tail, n = 1, last = id }
+		tails[suffix] = { t = tail, n = 1, last = id, d = today }
 	elseif t.t ~= tail then
-		t.bad = true
-	elseif t.last ~= id then
-		t.n, t.last = (t.n or 1) + 1, id
+		t.bad, t.d = true, today
+	else
+		t.d = today
+		if t.last ~= id then t.n, t.last = (t.n or 1) + 1, id end
+	end
+end
+
+-- Learned links and rolls not met for KEEP_DAYS go. One kept from before the days were noted
+-- is given today, so it has its KEEP_DAYS like the rest.
+function Sweep.Prune()
+	local keys, tails, seen = Learned()
+	local today = math.floor(Market.Now() / 86400)
+	for p in pairs(keys) do
+		local d = tonumber(seen[p])
+		if not d then
+			seen[p] = today
+		elseif today - d > TUNE.KEEP_DAYS then
+			keys[p], seen[p] = nil, nil
+		end
+	end
+	for p in pairs(seen) do
+		if keys[p] == nil then seen[p] = nil end
+	end
+	for suffix, t in pairs(tails) do
+		if type(t) ~= "table" then
+			tails[suffix] = nil
+		elseif not tonumber(t.d) then
+			t.d = today
+		elseif today - t.d > TUNE.KEEP_DAYS then
+			tails[suffix] = nil
+		end
 	end
 end
 
@@ -218,11 +261,16 @@ local function KeyFor(a, k, id, suffix, sample)
 		return key
 	end
 	if suffix == 0 then return tostring(id) end
-	local keys, tails = Learned()
-	key = keys[id .. ":" .. suffix]
-	if type(key) == "string" then return key end
+	local keys, tails, seen = Learned()
+	local p = id .. ":" .. suffix
+	key = keys[p]
+	if type(key) == "string" then
+		seen[p] = Today()
+		return key
+	end
 	local t = tails[suffix]
 	if type(t) == "table" and not t.bad and (t.n or 0) >= 2 and type(t.t) == "string" then
+		t.d = Today()
 		return id .. t.t
 	end
 	return nil
@@ -231,7 +279,6 @@ end
 -- ---------------------------------------------------------------------------------------------
 -- The scan
 -- ---------------------------------------------------------------------------------------------
-local s            -- the scan: nil, or see Start
 local mine = false -- a message of ours is being sent (the hook below tells ours from others')
 
 local function changed() ns.Fire("SweepChanged") end
@@ -303,6 +350,45 @@ end
 
 local finish
 
+-- THE RESULTS OF A PAGE ARE READ A SLICE OF THE FRAME AT A TIME. A browse page can bring
+-- hundreds of results, and each is a few game calls (the item's kind, a sample link, its level):
+-- read inside the event, one page was a visible hitch. They go on a queue (s.queue, s.qhead ..
+-- s.qtail) and are read until TUNE.BUDGET_MS is used, the rest on the next frames. The scan
+-- goes on asking for pages meanwhile; only the step after the last category (the searches for
+-- rolled items) waits until the queue is empty, since the results decide what is searched.
+local draining = false
+local function drain()
+	draining = false
+	if not s or s.qhead > s.qtail then return end
+	local a = AH()
+	if not a then return end
+	local t0 = Game.Clock()
+	local q, n = s.queue, 0
+	while s.qhead <= s.qtail do
+		local r = q[s.qhead]
+		q[s.qhead] = nil
+		s.qhead = s.qhead + 1
+		take(a, r)
+		n = n + 1
+		if n % 8 == 0 and Game.Clock() - t0 >= TUNE.BUDGET_MS then break end
+	end
+	if s.qhead > s.qtail then
+		s.queue, s.qhead, s.qtail = {}, 1, 0
+		return
+	end
+	draining = true
+	C_Timer.After(0, drain)
+end
+
+-- Results first .. #list of a list, onto the queue; read now as far as this frame's time goes.
+local function queue(list, first)
+	for i = first, #list do
+		s.qtail = s.qtail + 1
+		s.queue[s.qtail] = list[i]
+	end
+	if not draining then drain() end
+end
+
 -- A page of the category in hand. Pages can also come without our asking: the game's own browse
 -- list shows our results while it is open, and asks for the next page itself when it is scrolled.
 -- Those are read the same (a page lost would be listings never seen); only who asks next differs.
@@ -316,12 +402,19 @@ local function onBrowse(event, added)
 		after(TUNE.FAILED_PAUSE)
 		return
 	end
-	local list = added
-	if event == "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" or type(list) ~= "table" then
+	-- (_ADDED brings only the new page. _UPDATED means reading the whole list so far: only what
+	-- is past the results already taken from it is new; a list shorter than that was replaced,
+	-- and is read from its start.)
+	if event ~= "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" and type(added) == "table" then
+		s.taken = s.taken + #added
+		queue(added, 1)
+	else
 		local ok, all = pcall(a.GetBrowseResults)
-		list = ok and all or {}
+		all = ok and type(all) == "table" and all or {}
+		local first = #all >= s.taken and s.taken + 1 or 1
+		s.taken = #all
+		queue(all, first)
 	end
-	for i = 1, #list do take(a, list[i]) end
 	s.pages = s.pages + 1
 	local asked = s.waiting == "page"
 	s.waiting = nil
@@ -377,6 +470,8 @@ local function send()
 	if s.step == "browse" then
 		local filters = s.categories[s.qi]
 		if not filters then
+			-- (Results still being read may add rolled items to search for: they finish first.)
+			if s.qhead <= s.qtail then return end
 			s.step, s.si, s.tries = "search", 1, 0
 			changed()
 			return
@@ -391,6 +486,8 @@ local function send()
 		if s.more then
 			ok = pcall(a.RequestMoreBrowseResults)
 		else
+			-- (A new list: none of its results taken yet.)
+			s.taken = 0
 			ok = pcall(a.SendBrowseQuery, { searchString = "", sorts = s.browseSorts, filters = s.qualities,
 				itemClassFilters = filters })
 		end
@@ -499,7 +596,7 @@ function Sweep.Start()
 	s = {
 		step = "browse", categories = Sweep.Categories(), qi = 1, si = 1, tries = 0,
 		qualities = Qualities(), browseSorts = Sorts("Price", "Name"), searchSorts = Sorts("Buyout", "Bid"),
-		best = {}, facts = {}, order = {}, pending = {}, searches = {},
+		best = {}, facts = {}, order = {}, pending = {}, searches = {}, queue = {}, qhead = 1, qtail = 0, taken = 0,
 		rows = 0, own = 0, notGear = 0, named = 0, lost = 0, pages = 0, sent = 0, skipped = 0, timeouts = 0,
 		failures = 0, redone = 0, startedAt = Market.Now(), nextAt = 0,
 	}
@@ -564,6 +661,8 @@ for _, event in ipairs({ "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED", "AUCTION_HOUSE_
 	"AUCTION_HOUSE_BROWSE_FAILURE", "ITEM_SEARCH_RESULTS_UPDATED", "ITEM_SEARCH_RESULTS_ADDED", "AUCTION_HOUSE_CLOSED" }) do
 	pcall(frame.RegisterEvent, frame, event)
 end
+
+ns.me.On("Login", function() Sweep.Prune() end)
 
 function Sweep.Debug()
 	local out = {}

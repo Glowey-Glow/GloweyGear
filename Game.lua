@@ -36,14 +36,19 @@ end
 -- anything the addon may not read is treated as "not there yet": the engine does arithmetic on
 -- these numbers, and one unreadable value inside the bag mark's callback would cost the mark
 -- for the session.
+-- The second return says why there is no table when the answer cannot be believed ("secret",
+-- "failed", "noapi"); a plain nil with no reason is the game answering nothing for the item,
+-- which Stats.lua reads as "no stats" once the item's own data is in.
 function Game.ItemStats(link)
 	local f = C_Item and C_Item.GetItemStats
-	if not f then return nil end
+	if not f then return nil, "noapi" end
 	local ok, t = pcall(f, link)
-	if not ok or type(t) ~= "table" then return nil end
+	if not ok then return nil, "failed" end
+	if secret and secret(t) then return nil, "secret" end
+	if type(t) ~= "table" then return nil end
 	if secret then
 		for key, value in pairs(t) do
-			if secret(key) or secret(value) then return nil end
+			if secret(key) or secret(value) then return nil, "secret" end
 		end
 	end
 	return t
@@ -313,17 +318,33 @@ end
 -- The links of everything in the bags (the backpack and the four bag slots), into `out`.
 -- C_Container.GetContainerNumSlots / GetContainerItemLink (DOC ContainerDocumentation.lua:313,
 -- :209). The bank is not read: "carried" means on the character.
-function Game.BagLinks(out)
+-- keep (optional): keep(itemID) -> false passes a slot over before its link is made; the item ID
+-- is C_Container.GetContainerItemID (DOC ContainerDocumentation.lua), a slot whose ID cannot be
+-- read is kept.
+function Game.BagLinks(out, keep)
 	out = out or {}
 	local C = C_Container
 	if not (C and C.GetContainerNumSlots and C.GetContainerItemLink) then return out end
+	local idOf = keep and C.GetContainerItemID or nil
 	for bag = 0, (NUM_BAG_SLOTS or 4) do
 		local ok, slots = pcall(C.GetContainerNumSlots, bag)
 		slots = ok and Plain(slots) or nil
 		for slot = 1, tonumber(slots) or 0 do
-			local got, link = pcall(C.GetContainerItemLink, bag, slot)
-			link = got and Plain(link) or nil
-			if type(link) == "string" then out[#out + 1] = link end
+			local take = true
+			if idOf then
+				local okID, id = pcall(idOf, bag, slot)
+				id = okID and Plain(id) or nil
+				if id == nil and okID then
+					take = false   -- (an empty slot)
+				elseif type(id) == "number" then
+					take = keep(id) ~= false
+				end
+			end
+			if take then
+				local got, link = pcall(C.GetContainerItemLink, bag, slot)
+				link = got and Plain(link) or nil
+				if type(link) == "string" then out[#out + 1] = link end
+			end
 		end
 	end
 	return out

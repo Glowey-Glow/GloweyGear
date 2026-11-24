@@ -258,4 +258,18 @@ T.case("a page the game's own list asks for is read too", function()
 	T.eq(#Market.Saved().items, 5, "with every page")
 end)
 
+T.case("learned rolled links not met for a month are dropped at login", function()
+	fresh()
+	local today = math.floor(Market.Now() / 86400)
+	GloweyGearDB.akeys = { ["1:2"] = "1::::::2", ["3:4"] = "3::::::4", ["5:6"] = "5::::::6" }
+	GloweyGearDB.aseen = { ["1:2"] = today - 31, ["3:4"] = today - 2, ["7:8"] = today }
+	GloweyGearDB.atails = { [2] = { t = "x", n = 2, d = today - 40 }, [4] = { t = "y", n = 2 } }
+	Sweep.Prune()
+	T.eq(GloweyGearDB.akeys["1:2"], nil, "a link not met for a month goes")
+	T.eq(GloweyGearDB.akeys["3:4"], "3::::::4", "a recent one stays")
+	T.eq(GloweyGearDB.aseen["5:6"], today, "one from before the days were noted is given today")
+	T.eq(GloweyGearDB.aseen["7:8"], nil, "a date with no link goes")
+	T.eq(GloweyGearDB.atails[2], nil, "an old roll goes"); T.eq(GloweyGearDB.atails[4].d, today, "an undated roll is given today")
+end)
+
 return T.done()

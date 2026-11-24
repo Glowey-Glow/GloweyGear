@@ -389,6 +389,18 @@ T.case("item data arriving does not rebuild what is owned unless some of it was 
 	fire("PLAYER_EQUIPMENT_CHANGED"); tick()
 	local ctx = NS.Context()
 	T.eq(ctx.pending, 0, "everything owned is loaded")
+	-- a bag burst that moves no gear: what is owned is not built again; a weapon skill learned is
+	fire("BAG_UPDATE_DELAYED"); tick()
+	T.check(NS.Context() == ctx, "no gear moved: the same context")
+	WORLD.bags = { T.item({ equipLoc = "INVTYPE_FEET", raw = { ITEM_MOD_STRENGTH_SHORT = 2 } }) }
+	fire("BAG_UPDATE_DELAYED"); tick()
+	T.check(NS.Context() ~= ctx, "a piece of gear came into the bags: built again")
+	ctx = NS.Context()
+	fire("SKILL_LINES_CHANGED"); tick()
+	T.check(NS.Context() ~= ctx, "a weapon skill learned: built again")
+	WORLD.bags = {}
+	fire("BAG_UPDATE_DELAYED"); tick()
+	ctx = NS.Context()
 	local told, arrived = 0, 0
 	NS.On("OwnedChanged", function() told = told + 1 end)
 	NS.On("ItemsArrived", function() arrived = arrived + 1 end)
@@ -409,6 +421,8 @@ T.case("item data arriving does not rebuild what is owned unless some of it was 
 	fire("PLAYER_EQUIPMENT_CHANGED"); tick()
 	ctx = NS.Context()
 	T.eq(ctx.pending, 1, "one owned item is waiting")
+	fire("GET_ITEM_INFO_RECEIVED", 123, true); tick()
+	T.check(NS.Context() == ctx, "something else arrived: the waiting item is looked at, nothing is built")
 	T.load(late)
 	fire("GET_ITEM_INFO_RECEIVED", 124, true); tick()
 	T.check(NS.Context() ~= ctx, "its arrival reads what is owned again"); T.eq(NS.Context().pending, 0, "and nothing waits now")

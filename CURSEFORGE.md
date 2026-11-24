@@ -6,9 +6,9 @@ By Glowey. A standalone addon that **integrates with Daylight UI** when it's ins
 
 ---
 
-## New in 1.1.0
-- **Your own stat weights:** the **Stat Weights** page in Gear's options has a box for each stat. Change any; the rest keep Glowey's recommendation, and **Revert** puts yours back, one stat or the whole spec.
-- **Works without Daylight UI:** its settings are in Glowey's settings (**/glowey**). In **Blizzard Style** the Upgrades for Sale window docks flush beside the game's Auction House.
+## New in 1.1.1
+- **Stale lists say so:** a list read more than a day ago reads "Stale: List read 30 h ago.", so you know to scan again.
+- **Smoother at the Auction House:** the scan reads each page over a few frames, the sliders rearrange the list once a frame, and looting no longer rereads your gear when none moved. Old roll data is dropped after 30 days.
 ---
 
 ## What's in it

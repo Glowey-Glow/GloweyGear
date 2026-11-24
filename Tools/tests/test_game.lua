@@ -101,6 +101,7 @@ T.case("class, level, skills, spells, worn and carried", function()
 	C_Container = {
 		GetContainerNumSlots = function(bag) return bag == 0 and 3 or (bag == 2 and 1 or 0) end,
 		GetContainerItemLink = function(bag, slot) if slot ~= 2 then return "item:" .. bag .. slot end end,
+		GetContainerItemID = function(bag, slot) if slot ~= 2 then return bag * 10 + slot end end,
 	}
 	NUM_BAG_SLOTS = 4
 	InCombatLockdown = function() return true end
@@ -113,6 +114,8 @@ T.case("class, level, skills, spells, worn and carried", function()
 	T.eq(table.concat(G.BagLinks(), " "), "item:01 item:03 item:21", "every bag, empty slots skipped")
 	local into = { "kept" }
 	T.eq(#G.BagLinks(into), 4, "appends to the table given")
+	T.eq(table.concat(G.BagLinks({}, function(id) return id ~= 3 end), " "), "item:01 item:21",
+		"a slot the test turns down is passed over")
 	T.eq(G.InCombat(), true, "in combat"); T.eq(G.Clock(), 12.5, "clock")
 	UnitLevel = function() return 0 end
 	T.eq(load().Level(), nil, "a level of 0 is 'not known yet'")
