@@ -461,30 +461,33 @@ end
 -- At login: the other addons' switches follow the settings; then the question, once the
 -- screen is free (Daylight UI's own first-login windows and the other Daylight plugins'
 -- guides go first, and the screen must have been free for a moment).
-local FIRST, AGAIN, QUIET = 8, 3, 6
+local FIRST, AGAIN, QUIET, LOOKS = 8, 3, 6, 200
 if ns.me and type(ns.me.On) == "function" then
 	ns.me.On("Login", function()
 		-- (Twice: some addons read their settings a little after login, and Daylight UI's bags
 		-- take our mark at login too.)
 		C_Timer.After(1, function() Overlap.Changed() Overlap.Apply() end)
 		C_Timer.After(6, function() Overlap.Changed() Overlap.Apply() end)
-		local waited, freeSince
-		local function ask()
+		-- (The waiting has an end: after LOOKS looks, about ten minutes, it is asked at the
+		-- next login instead; no timer runs for the whole session.)
+		local waited, freeSince, looks = nil, nil, 0
+		local ask
+		local function later()
+			looks = looks + 1
+			if looks < LOOKS then C_Timer.After(AGAIN, ask) end
+		end
+		function ask()
 			if frame and frame:IsShown() then return end
 			Overlap.Changed()
 			if #Overlap.Unasked() == 0 then return end
 			if InCombatLockdown() or DaylightBusy() then
 				waited, freeSince = true, nil
-				C_Timer.After(AGAIN, ask)
-				return
+				return later()
 			end
 			if waited then
 				local now = GetTime()
 				freeSince = freeSince or now
-				if now - freeSince < QUIET then
-					C_Timer.After(AGAIN, ask)
-					return
-				end
+				if now - freeSince < QUIET then return later() end
 			end
 			Overlap.Show(false)
 		end

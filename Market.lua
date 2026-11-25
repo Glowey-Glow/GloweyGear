@@ -64,7 +64,7 @@
 --     documents none).
 --
 -- luacheck: read globals C_AuctionHouse CreateFrame C_Timer UnitName
--- luacheck: read globals GetServerTime issecretvalue geterrorhandler time C_AddOns
+-- luacheck: read globals GetServerTime issecretvalue geterrorhandler time C_AddOns UnitGUID IsLoggedIn
 
 local _, ns = ...
 if ns.off or not ns.ok then return end
@@ -1300,24 +1300,45 @@ local SCANNERS = {
 }
 Market.SCANNERS = SCANNERS
 
--- The names of the ones installed and enabled for this character, in SCANNERS' order (installed is
--- read once: an addon switched on or off counts from the next reload, as the game loads it; `again`
--- reads anew). An option that decides whether it fills the list (Auctionator's) is read each time.
+-- The names of the ones running for this character, in SCANNERS' order. Running = loaded (every
+-- one of them loads at login when it's on), or a load-on-demand one ticked for this character
+-- (asked by GUID, as the game's own addon list asks: by name it answered for all characters, so
+-- an Auctionator switched off here still counted and our scan was never offered). Read once
+-- logged in (an addon switched on or off counts from the next reload, as the game loads it;
+-- `again` reads anew); before that, read on each ask. An option that decides whether it fills
+-- the list (Auctionator's) is read each time.
 local scanners
+local function Running(A, name)
+	if type(A.IsAddOnLoaded) == "function" then
+		local ok, loaded = pcall(A.IsAddOnLoaded, name)
+		if ok and loaded then return true end
+	end
+	if type(A.IsAddOnLoadOnDemand) ~= "function" or type(A.GetAddOnEnableState) ~= "function" then return false end
+	local okD, lod = pcall(A.IsAddOnLoadOnDemand, name)
+	if not (okD and lod) then return false end
+	local okG, guid = pcall(UnitGUID, "player")
+	guid = okG and plain(guid) or nil
+	local okS, state = pcall(A.GetAddOnEnableState, name, guid)
+	return okS and type(state) == "number" and state > 0
+end
 function Market.Others(again)
 	if not scanners or again then
-		scanners = {}
+		local list = {}
 		local A = C_AddOns
-		if type(A) == "table" and type(A.DoesAddOnExist) == "function" and type(A.GetAddOnEnableState) == "function" then
-			local okN, who = pcall(UnitName, "player")
-			who = okN and plain(who) or nil
+		if type(A) == "table" and type(A.DoesAddOnExist) == "function" then
 			for _, sc in ipairs(SCANNERS) do
 				local okE, exists = pcall(A.DoesAddOnExist, sc[1])
-				if okE and exists then
-					local okS, state = pcall(A.GetAddOnEnableState, sc[1], who)
-					if okS and type(state) == "number" and state > 0 then scanners[#scanners + 1] = sc end
-				end
+				if okE and exists and Running(A, sc[1]) then list[#list + 1] = sc end
 			end
+		end
+		local okL, inGame = pcall(IsLoggedIn)
+		scanners = (okL and inGame) and list or nil
+		if not scanners then
+			local names = {}
+			for _, sc in ipairs(list) do
+				if not sc[3] or sc[3]() then names[#names + 1] = sc[2] end
+			end
+			return names
 		end
 	end
 	local names = {}

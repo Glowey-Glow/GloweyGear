@@ -60,17 +60,35 @@ local function str(v)
 	return tostring(v)
 end
 
+-- A tooltip's line font strings, looked up by name once each (the game keeps them; a tooltip
+-- is filled again several times a second while it shows, so no names are built per hover).
+local regions = {}
+local function Region(name, side, i)
+	local byName = regions[name]
+	if not byName then
+		byName = { TextLeft = {}, TextRight = {} }
+		regions[name] = byName
+	end
+	local list = byName[side]
+	local r = list[i]
+	if r == nil then
+		r = _G[name .. side .. i] or false
+		if r then list[i] = r end
+	end
+	return r or nil
+end
+
 -- Whether the tooltip already has the line (an item tooltip fills several times a second).
 local function HasLine(tip, left, right)
 	local name = type(tip.GetName) == "function" and tip:GetName() or nil
 	local n = type(tip.NumLines) == "function" and plain(tip:NumLines()) or nil
 	if type(name) ~= "string" or type(n) ~= "number" then return false end
 	for i = 1, n do
-		local l = _G[name .. "TextLeft" .. i]
+		local l = Region(name, "TextLeft", i)
 		local text = l and l.GetText and plain(l:GetText())
 		if text == left then
 			if right == nil then return true end
-			local r = _G[name .. "TextRight" .. i]
+			local r = Region(name, "TextRight", i)
 			local other = r and r.GetText and plain(r:GetText())
 			if (other or "") == right then return true end
 		end

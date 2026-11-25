@@ -342,6 +342,14 @@ T.case("our own scan: only when allowed", function()
 	w.addons.Auctionator = 0
 	T.eq(#Market.Others(true), 0, "installed but switched off for this character: not counted")
 	w.addons.Auctionator = 2
+	-- switched off for this character while the list says on for all of them: never loaded, not counted
+	w.unloaded.Auctionator = true
+	T.eq(#Market.Others(true), 0, "installed, not loaded: not counted")
+	T.eq(Market.CanScan(), true, "ours is offered beside a switched-off Auctionator")
+	w.unloaded.Auctionator = nil
+	w.lod.Auctionator = true
+	T.eq(Market.Others(true)[1], "Auctionator", "load on demand and ticked here: counted before it loads")
+	w.lod.Auctionator = nil
 	T.eq(Market.Others(true)[1], "Auctionator", "installed and on: counted")
 	offered, reason = Market.CanScan()
 	T.eq(offered, false, "no scan of ours beside it"); T.eq(reason, "other", "and the reason says so")

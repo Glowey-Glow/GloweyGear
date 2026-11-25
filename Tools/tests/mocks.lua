@@ -400,7 +400,13 @@ function T.world()
 	def("C_AddOns", {
 		DoesAddOnExist = function(name) return w.addons[name] ~= nil end,
 		GetAddOnEnableState = function(name) return w.addons[name] or 0 end,
+		-- (loaded at login when on, unless w.unloaded[folder]; w.lod[folder] = load on demand)
+		IsAddOnLoaded = function(name) return (w.addons[name] or 0) > 0 and not w.unloaded[name] and not w.lod[name] end,
+		IsAddOnLoadOnDemand = function(name) return w.lod[name] == true end,
 	})
+	w.unloaded, w.lod = {}, {}
+	def("UnitGUID", function() return "Player-1-00000001" end)
+	def("IsLoggedIn", function() return true end)
 	def("GetRealmName", function() return "Test Realm" end)
 	def("UnitFactionGroup", function() return "Alliance" end)
 	def("issecretvalue", false)

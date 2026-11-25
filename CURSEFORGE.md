@@ -6,10 +6,9 @@ By Glowey. A standalone addon that **integrates with Daylight UI** when it's ins
 
 ---
 
-## New in 1.2.1
-- **Comparisons in Glowey's Recipes too:** hovering a crafted item there shows Gear's comparison beside it. Other addons can ask for it the same way (GloweyGearAPI.Compare).
-- **Comparison tooltips:** hover an item in Upgrades for Sale and the piece it replaces shows beside it, headed **Equipped** or **In Your Bags**, with the game's list of stat changes. Holding Shift still shows the game's own comparison, on the other side.
-- **Works with your Auction House addon:** while AuctionMaster, AHDB, Auctioneer or ForeverForge Auction is installed (or Auctionator with its whole-house scan on), their full scan is the way and Gear reads the list it fetches. Auctionator on its default scan, TSM and Oribos Exchange no longer hide Gear's own scan.
+## New in 1.2.2
+- **Scan with Auctionator switched off:** Scan the Auction House is offered again when Auctionator (or another scanning addon) is installed but switched off for your character.
+- **Lighter:** the comparison tooltip and the window docked beside the Auction House no longer check anything every frame; they follow the changes instead.
 ---
 
 ## What's in it

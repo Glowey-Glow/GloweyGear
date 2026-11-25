@@ -38,6 +38,48 @@ ns.CompareTip = Tip
 local HEADER_PAD = 30      -- TooltipComparisonManager.lua: COMPARE_HEADER_PADDING
 local tip, made = nil, false
 local shownFor            -- the main tooltip ours stands beside
+local hooked = setmetatable({}, { __mode = "k" })   -- the tooltips whose OnHide we hooked
+local placeDue = false
+
+-- Stands it again on the next frame: the game shows its comparison first and anchors it after
+-- (TooltipComparisonManager.lua:48-60 AnchorShoppingTooltips: SetShown, then SetPoint).
+local function PlaceSoon()
+	if placeDue or not shownFor then return end
+	local timer = rawget(_G, "C_Timer")
+	local After = type(timer) == "table" and timer.After or nil
+	if not After then return Tip.Place(shownFor) end
+	placeDue = true
+	After(0, function()
+		placeDue = false
+		if shownFor then Tip.Place(shownFor) end
+	end)
+end
+
+-- (Gone with the item's tooltip, whatever hid it: a hook on that tooltip's OnHide, once each.)
+local function HookMain(main)
+	if hooked[main] or type(main.HookScript) ~= "function" then return end
+	hooked[main] = true
+	main:HookScript("OnHide", function(self)
+		if shownFor == self then Tip.Hide() end
+	end)
+end
+
+-- The game's own comparison coming or going (Shift, "Always Compare Items") moves ours to the
+-- other side: its ShoppingTooltip1 / 2 showing or hiding, and Shift itself while ours shows.
+local shopHooked = false
+local function HookShopping()
+	if shopHooked then return end
+	local any = false
+	for _, name in ipairs({ "ShoppingTooltip1", "ShoppingTooltip2" }) do
+		local s = rawget(_G, name)
+		if type(s) == "table" and type(s.HookScript) == "function" then
+			any = true
+			s:HookScript("OnShow", PlaceSoon)
+			s:HookScript("OnHide", PlaceSoon)
+		end
+	end
+	shopHooked = any
+end
 
 local function Make()
 	if made then return tip end
@@ -49,12 +91,13 @@ local function Make()
 	if not ok or not f then return nil end
 	f:SetFrameStrata("TOOLTIP")
 	f:SetClampedToScreen(true)
-	-- (Gone with the item's tooltip, whatever hid it.)
-	f:SetScript("OnUpdate", function(self)
-		if not shownFor or not shownFor:IsShown() then return self:Hide() end
-		-- (The game's own comparison can come or go with Shift while it shows: kept on the
-		-- other side. Place does nothing while the side is unchanged.)
-		Tip.Place(shownFor)
+	-- (Shift, only while ours shows: MODIFIER_STATE_CHANGED(key, down),
+	-- Blizzard_APIDocumentationGenerated/KeyBindingsDocumentation.lua.)
+	f:SetScript("OnEvent", PlaceSoon)
+	f:SetScript("OnShow", function(self) pcall(self.RegisterEvent, self, "MODIFIER_STATE_CHANGED") end)
+	f:SetScript("OnHide", function(self)
+		pcall(self.UnregisterEvent, self, "MODIFIER_STATE_CHANGED")
+		shownFor = nil
 	end)
 	tip = f
 	return f
@@ -81,14 +124,15 @@ local function Delta(newLink, oldLink)
 end
 
 -- The game's comparison, when it is showing beside `main`: the side it took ("left" / "right").
-local function TheirSide(main)
-	for _, s in ipairs({ rawget(_G, "ShoppingTooltip1") or false, rawget(_G, "ShoppingTooltip2") or false }) do
-		if type(s) == "table" and s.IsShown and s:IsShown() and s.GetOwner and s:GetOwner() == main then
-			local sl, ml = s:GetLeft(), main:GetLeft()
-			if sl and ml then return sl < ml and "left" or "right" end
-		end
+local function SideOf(s, main)
+	if type(s) == "table" and s.IsShown and s:IsShown() and s.GetOwner and s:GetOwner() == main then
+		local sl, ml = s:GetLeft(), main:GetLeft()
+		if sl and ml then return sl < ml and "left" or "right" end
 	end
 	return nil
+end
+local function TheirSide(main)
+	return SideOf(rawget(_G, "ShoppingTooltip1"), main) or SideOf(rawget(_G, "ShoppingTooltip2"), main)
 end
 
 function Tip.Place(main)
@@ -142,8 +186,10 @@ function Tip.Show(main, row)
 		f:AddLine(rawget(_G, "ITEM_DELTA_DESCRIPTION") or "If you replace this item, the following stat changes will occur:", 1, 0.82, 0, true)
 		for _, line in ipairs(lines) do f:AddLine(line, 1, 1, 1, true) end
 	end
-	shownFor = main
+	HookMain(main)
+	HookShopping()
 	f:Show()
+	shownFor = main
 	Tip.Place(main)
 end
 

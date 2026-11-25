@@ -1816,11 +1816,21 @@ Place = function()
 	if f:IsShown() then Paint() end
 end
 
--- The host comes, goes, moves and scales: looked at every frame while an Auction House is open
--- or the window hangs on one (four reads; the window is only placed again when one changed).
+-- The host comes, goes, moves and scales. No polling: while an Auction House is open or the
+-- window hangs on one, the host windows' own calls say so (Daylight UI steps its windows by hand
+-- with SetAlpha and SetPoint, DaylightUI\Windows\Feel.lua, drags them with StartMoving /
+-- StopMovingOrSizing, Windows\Frame.lua Win.Drag, and scales them with SetScale; the game's
+-- window is placed by the panel manager's SetPoint, and Daylight UI parks it with SetAlpha), as do
+-- their OnShow / OnHide and the screen's scale events. Each one looks again (four reads; the window
+-- is only placed again when one changed). While a host is dragged our window follows on its own:
+-- it is anchored to it.
 local watch = CreateFrame("Frame")
 local seen = {}
+local watching = false
+local hostHooked = setmetatable({}, { __mode = "k" })
+
 local function Watch()
+	if not watching then return end
 	local host = Host()
 	local l, t, r, s
 	if host then l, t, r, s = host:GetLeft(), host:GetTop(), host:GetRight(), host:GetEffectiveScale() end
@@ -1828,22 +1838,59 @@ local function Watch()
 		seen.host, seen.l, seen.t, seen.r, seen.s = host, l, t, r, s
 		Place()
 	end
-	if not host and not ns.Market.IsOpen() then watch:SetScript("OnUpdate", nil) end
+	if not host and not ns.Market.IsOpen() then watching = false end
 end
 
+local function HookHost(f)
+	if type(f) ~= "table" or hostHooked[f] then return end
+	hostHooked[f] = true
+	local hook = rawget(_G, "hooksecurefunc")
+	if hook then
+		for _, method in ipairs({ "SetPoint", "SetAlpha", "SetScale", "StopMovingOrSizing" }) do
+			if type(f[method]) == "function" then pcall(hook, f, method, Watch) end
+		end
+	end
+	if type(f.HookScript) == "function" then
+		pcall(f.HookScript, f, "OnShow", Watch)
+		pcall(f.HookScript, f, "OnHide", Watch)
+	end
+end
+
+-- The windows to listen to, once each as they come to be (the game's is load-on-demand; Daylight
+-- UI's is built when its module starts). UIParent too: its alpha counts in Visible().
+local function HookHosts()
+	HookHost(rawget(_G, "DaylightUIAuctionHouse"))
+	HookHost(rawget(_G, "AuctionHouseFrame"))
+	HookHost(UIParent)
+end
+
+-- A look now and a couple more just after (the windows build and start fading in after the
+-- event); one-shot timers, nothing that keeps running.
 local function StartWatch()
-	if Window.frame then watch:SetScript("OnUpdate", Watch) end
+	if not Window.frame then return end
+	watching = true
+	HookHosts()
+	Watch()
+	C_Timer.After(0, function() HookHosts() Watch() end)
+	C_Timer.After(0.3, function() HookHosts() Watch() end)
 end
 
 watch:SetScript("OnEvent", function(_, event)
 	if event == "AUCTION_HOUSE_SHOW" then
 		StartWatch()
+	elseif event == "AUCTION_HOUSE_CLOSED" or event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
+		-- (After the windows' own handlers have run: Market's flag, the close.)
+		C_Timer.After(0, Watch)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if S.stale and Shown() then Window.Refresh(S.force) end
 	end
 end)
 pcall(watch.RegisterEvent, watch, "AUCTION_HOUSE_SHOW")
+pcall(watch.RegisterEvent, watch, "AUCTION_HOUSE_CLOSED")
+pcall(watch.RegisterEvent, watch, "UI_SCALE_CHANGED")
+pcall(watch.RegisterEvent, watch, "DISPLAY_SIZE_CHANGED")
 pcall(watch.RegisterEvent, watch, "PLAYER_REGEN_ENABLED")
+
 
 -- =============================================================================================
 -- Open, close

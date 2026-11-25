@@ -24,6 +24,7 @@ local function frame(template)
 	function f:SetFrameStrata() end
 	function f:SetClampedToScreen() end
 	function f:SetScript(name, fn) self.scripts[name] = fn end
+	function f:HookScript(name, fn) self.hooks = self.hooks or {}; self.hooks[name] = fn end
 	function f:SetOwner(owner) self.owner = owner end
 	function f:GetOwner() return self.owner end
 	function f:ClearAllPoints() self.points = {} end
@@ -109,8 +110,15 @@ T.case("the side: room, and away from the game's own comparison", function()
 	Tip.Place(main)
 	T.eq(side(), "TOPRIGHT", "the game's comparison took the right: ours goes left")
 	ShoppingTooltip1.shown = false
-	Tip.Place(main)
-	T.eq(side(), "TOPLEFT", "back on the right once it's gone")
+	ShoppingTooltip1.hooks.OnHide(ShoppingTooltip1)
+	T.eq(side(), "TOPLEFT", "back on the right once it's gone (its OnHide, no polling)")
+	ShoppingTooltip1.shown = true
+	ShoppingTooltip1.hooks.OnShow(ShoppingTooltip1)
+	T.eq(side(), "TOPRIGHT", "and left again when it shows (its OnShow)")
+	ShoppingTooltip1.shown = false
+	tip.scripts.OnEvent(tip, "MODIFIER_STATE_CHANGED", "LSHIFT", 0)
+	T.eq(side(), "TOPLEFT", "Shift let go: placed again")
+	T.check(tip.scripts.OnUpdate == nil, "no OnUpdate on our tooltip")
 end)
 
 T.case("nothing to compare: hidden; gone with the item's tooltip", function()
@@ -118,7 +126,7 @@ T.case("nothing to compare: hidden; gone with the item's tooltip", function()
 	T.check(not tip:IsShown(), "an empty slot: no comparison")
 	Tip.Show(main, { link = "item:200", replaces = { link = "item:100" } })
 	main.shown = false
-	tip.scripts.OnUpdate(tip)
+	main.hooks.OnHide(main)
 	T.check(not tip:IsShown(), "hidden when the item's tooltip is")
 	main.shown = true
 	Tip.Show(main, { link = "item:200", replaces = { link = "item:100" } })

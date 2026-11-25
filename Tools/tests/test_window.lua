@@ -630,7 +630,7 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	w.ahmod.ns.Window = { frame = { tab = "buy" } }
 	ah.open = true
 	w.fire("AUCTION_HOUSE_SHOW")
-	w.update()
+	w.frames(1)
 	T.eq(Window.S.mode, "docked", "docked"); T.eq(Window.S.side, "right", "on the right")
 	T.check(f:IsShown() and tab:IsShown(), "window and tab shown")
 	T.check(f.points[1][1] == "TOPLEFT" and f.points[1][2] == host and f.points[1][3] == "TOPRIGHT" and f.points[1][4] == 0
@@ -654,18 +654,18 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 
 	-- the host moves: no room on the right, then on neither side
 	host.rect = { 900, 1860, 900 }
-	w.update()
+	host:SetPoint("TOPLEFT")   -- (moved: Daylight UI places its window with SetPoint, hooked)
 	T.eq(Window.S.side, "left", "to the left when the right has no room")
 	T.check(f.points[1][1] == "TOPRIGHT" and f.points[1][3] == "TOPLEFT", "flush against the left edge")
 	T.check(tab.points[1][1] == "TOPRIGHT" and tab.points[1][2] == f, "the tab on the far side there")
 	host.rect = { 200, 1700, 900 }
-	w.update()
+	host:SetPoint("TOPLEFT")
 	T.eq(Window.S.mode, "free", "no room on either side: where the player left it"); T.check(not tab:IsShown(), "with no tab")
 	T.check(f:IsShown() and f.points[1][2] == screen, "placed on the screen, not on the host")
 	Window.Toggle()
 	T.check(not f:IsShown(), "/gear puts it away there"); Window.Toggle(); T.check(f:IsShown(), "and brings it back")
 	host.rect = { 16, 976, 900 }
-	w.update()
+	host:SetPoint("TOPLEFT")
 	T.eq(Window.S.mode, "docked", "docked again once there is room")
 
 	-- Escape belongs to the Auction House window while docked: Host.Window's close() leaves it be
@@ -683,7 +683,7 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	host.shown = false
 	ah.open = false
 	w.fire("AUCTION_HOUSE_CLOSED")
-	w.update()
+	w.frames(1)
 	T.eq(Window.S.mode, "hidden", "gone with the Auction House"); T.check(not f:IsShown() and not tab:IsShown(), "window and tab")
 	Window.Toggle()
 	T.eq(Window.S.mode, "free", "/gear: on its own"); T.eq(f.padSecond, nil, "taking the controller's cursor")
@@ -744,7 +744,7 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	function game:GetEffectiveAlpha() return self.alpha end
 	rawset(_G, "AuctionHouseFrame", game)
 	GloweyGearDB.window.folded = nil
-	w.update()
+	w.fire("AUCTION_HOUSE_SHOW"); w.frames(1)   -- (its window is looked for as the Auction House opens)
 	T.eq(Window.S.mode, "docked", "docked to the game's window"); T.eq(Window.S.side, "right", "on its right")
 	T.check(f.points[1][1] == "TOPLEFT" and f.points[1][2] == game and f.points[1][3] == "TOPRIGHT" and f.points[1][4] == 0
 		and f.points[1][5] == 0, "flush against its right edge, tops level")
@@ -773,12 +773,12 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	game.SearchBar = nil
 	-- parked at no opacity (Daylight UI's window standing in for it): not a host
 	game.alpha = 0
-	w.update()
+	game:SetAlpha(0)   -- (parked with SetAlpha, hooked)
 	T.check(Window.S.mode ~= "docked", "a parked game window is not docked to")
 	-- both up: Daylight UI's comes first
 	game.alpha = 1
 	host.shown = true
-	w.update()
+	host:SetAlpha(1)   -- (Daylight UI fades its window in with SetAlpha, hooked)
 	T.check(Window.S.mode == "docked" and f.points[1][2] == host, "Daylight UI's window wins over the game's")
 	host.shown = false
 	rawset(_G, "AuctionHouseFrame", nil)

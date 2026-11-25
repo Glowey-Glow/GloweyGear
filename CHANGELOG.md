@@ -1,5 +1,10 @@
 # Glowey's Gear
 
+## 1.2.2
+- Scan the Auction House is offered again with Auctionator (or another scanning addon) installed but switched off. Gear asked the addon list by your character's name, which this client answers for all characters, so a switched-off Auctionator still counted and Gear's own scan stayed hidden. It now counts only a scanning addon that is loaded (or one that loads on demand and is on for this character).
+- Lighter: the comparison beside an item no longer re-places itself on every frame (it moves only when Shift or the game's own comparison changes it), the Upgrades for Sale window no longer checks the Auction House window's position every frame while it's open, and the login question no longer re-asks every 3 seconds forever while you're busy.
+- Without Daylight UI's tooltips, the Gear Advice line looks up the tooltip's lines once instead of on every refresh.
+
 ## 1.2.1
 - Other addons can show Gear's comparison beside their own item tooltips (GloweyGearAPI.Compare, API version 2): Glowey's Recipes uses it for the items you can craft.
 - The comparison beside an item moves to the other side as soon as the game's own comparison appears or goes with Shift.
