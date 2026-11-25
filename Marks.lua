@@ -385,6 +385,13 @@ end
 --   GloweyGearAPI.Watch(fn)        fn() runs whenever the answers may have changed (gear put on,
 --                                  a level, a setting, item data arriving). Keep it cheap.
 --
+--   GloweyGearAPI.Compare(tooltip, link) -> true when shown   (version 2) beside `tooltip`, which
+--                                  already shows the item, Gear's comparison: the piece it would
+--                                  replace (Equipped / In Your Bags) and the stat changes, as in
+--                                  Upgrades for Sale (CompareTip.lua). Nothing for an item that
+--                                  isn't gear, nor in a fight. It goes with that
+--                                  tooltip; GloweyGearAPI.HideCompare() takes it away sooner.
+--
 -- link: an item link or "item:12345". The item is judged as one you don't own yet. The answer
 -- for a link is kept, as the bags' is, so asking for every row of a list each repaint is fine.
 local function PublicUpgrade(link)
@@ -394,8 +401,26 @@ local function PublicUpgrade(link)
 	if not entry or not entry.mark then return false end
 	return true, entry.text, entry.color
 end
+-- (Worked out on hover only: one verdict, the same call the tooltip row makes.)
+local function PublicCompare(tooltip, link)
+	local Tip = ns.CompareTip
+	if not Tip then return false end
+	if type(tooltip) ~= "table" or type(link) ~= "string" or ns.Game.InCombat() then
+		Tip.Hide()
+		return false
+	end
+	local v = ns.Verdict(link, false)
+	local rep = v and v.replaces or nil
+	if type(rep) ~= "table" or type(rep.link) ~= "string" then
+		Tip.Hide()
+		return false
+	end
+	-- (The verdict's table is reused by the next one: what is needed is copied out.)
+	Tip.Show(tooltip, { link = link, replaces = { link = rep.link } })
+	return true
+end
 rawset(_G, "GloweyGearAPI", {
-	version = 1,
+	version = 2,
 	Upgrade = function(link)
 		local ok, up, text, color = pcall(PublicUpgrade, link)
 		if not ok then return false end
@@ -405,6 +430,13 @@ rawset(_G, "GloweyGearAPI", {
 		if type(fn) ~= "function" then return false end
 		watchers[#watchers + 1] = fn
 		return true
+	end,
+	Compare = function(tooltip, link)
+		local ok, shown = pcall(PublicCompare, tooltip, link)
+		return ok and shown == true
+	end,
+	HideCompare = function()
+		if ns.CompareTip then pcall(ns.CompareTip.Hide) end
 	end,
 })
 

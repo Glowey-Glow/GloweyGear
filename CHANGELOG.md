@@ -1,5 +1,9 @@
 # Glowey's Gear
 
+## 1.2.1
+- Other addons can show Gear's comparison beside their own item tooltips (GloweyGearAPI.Compare, API version 2): Glowey's Recipes uses it for the items you can craft.
+- The comparison beside an item moves to the other side as soon as the game's own comparison appears or goes with Shift.
+
 ## 1.2.0
 - Comparison tooltips in the Upgrades for Sale list. Hovering an item now shows, beside its tooltip, the piece Gear says it replaces, headed "Equipped" when you wear it or "In Your Bags" when it's carried, with the game's own list of the stat changes the swap makes. For rings and trinkets that is the weaker of your two; under Both Together, each hand's row compares with what that hand holds now. An item that fills an empty slot shows none. Holding Shift still shows the game's own comparison with what you have equipped; Gear's then moves to the other side so both can be read.
 - Scan the Auction House now knows the Auction House addons that do a full scan of their own: AuctionMaster, Auction House DataBase (AHDB), Auctioneer and ForeverForge Auction, besides Daylight Mogul and Auctionator. While one of them is installed, its full scan is the way (Gear reads the list it fetches), as the game allows only one full scan in about fifteen minutes.

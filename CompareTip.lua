@@ -51,7 +51,10 @@ local function Make()
 	f:SetClampedToScreen(true)
 	-- (Gone with the item's tooltip, whatever hid it.)
 	f:SetScript("OnUpdate", function(self)
-		if not shownFor or not shownFor:IsShown() then self:Hide() end
+		if not shownFor or not shownFor:IsShown() then return self:Hide() end
+		-- (The game's own comparison can come or go with Shift while it shows: kept on the
+		-- other side. Place does nothing while the side is unchanged.)
+		Tip.Place(shownFor)
 	end)
 	tip = f
 	return f

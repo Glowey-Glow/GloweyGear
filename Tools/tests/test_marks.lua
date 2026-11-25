@@ -730,4 +730,35 @@ T.case("GloweyGearAPI: another addon's question, answered and kept", function()
 	T.eq(api.Upgrade(better), false, "and the helm now worn is no upgrade over itself")
 end)
 
+T.case("GloweyGearAPI.Compare: Gear's comparison beside another addon's tooltip", function()
+	local M = boot({ shim = "own" })
+	local api = rawget(_G, "GloweyGearAPI")
+	T.eq(api.version, 2, "version 2")
+	T.check(type(api.Compare) == "function" and type(api.HideCompare) == "function", "Compare and HideCompare")
+	local shown, hidden = {}, 0
+	NS.CompareTip = { Show = function(tip, row) shown[#shown + 1] = { tip = tip, row = row } end,
+		Hide = function() hidden = hidden + 1 end }
+	local worn, better = helm(10), helm(15)
+	WORLD.worn[1] = worn
+	WORLD.bags = {}
+	owned()
+	local tip = {}
+	T.eq(api.Compare(tip, better), true, "a helm: shown")
+	T.eq(shown[1] and shown[1].tip, tip, "beside the tooltip given")
+	T.eq(shown[1].row.link, better, "for that item")
+	T.eq(shown[1].row.replaces.link, worn, "against the helm worn")
+	T.eq(api.Compare(tip, nil), false, "no item: not shown"); T.check(hidden >= 1, "and taken away")
+	T.eq(api.Compare(nil, better), false, "no tooltip: not shown")
+	combat = true
+	T.eq(api.Compare(tip, better), false, "not in a fight")
+	combat = false
+	NS.CompareTip.Show = function() error("raises") end
+	T.eq(api.Compare(tip, better), false, "an error inside never reaches the caller")
+	api.HideCompare()
+	NS.CompareTip = nil
+	T.eq(api.Compare(tip, better), false, "without the file: nothing")
+	api.HideCompare()
+	T.check(M ~= nil, "booted")
+end)
+
 return T.done()
