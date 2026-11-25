@@ -14,6 +14,7 @@
 # Glowey's Plugins window as it loads.)
 ## LoadSavedVariablesFirst: 1
 
+ErrorTag.lua
 Locales\Locales.lua
 Locales\deDE.lua
 Locales\frFR.lua
