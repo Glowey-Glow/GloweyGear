@@ -272,4 +272,20 @@ T.case("learned rolled links not met for a month are dropped at login", function
 	T.eq(GloweyGearDB.atails[2], nil, "an old roll goes"); T.eq(GloweyGearDB.atails[4].d, today, "an undated roll is given today")
 end)
 
+T.case("AHDB's busy flag: set while the sweep sends, cleared at the end, another addon's left alone", function()
+	rawset(_G, "AuctionDB", { LastPrice = function() end })
+	fresh()
+	sale({}, PLATE_CHEST, 1000)
+	T.check(Sweep.Start(), "started")
+	T.eq(rawget(_G, "AuctionDB").ahBusy, true, "set while it runs")
+	T.check(finish(), "finished")
+	T.eq(rawget(_G, "AuctionDB").ahBusy, nil, "cleared when it ended")
+	fresh()
+	rawget(_G, "AuctionDB").ahBusy = true    -- another addon's
+	T.check(Sweep.Start(), "started again")
+	T.check(finish(), "finished again")
+	T.eq(rawget(_G, "AuctionDB").ahBusy, true, "another addon's flag left as it was")
+	rawset(_G, "AuctionDB", nil)
+end)
+
 return T.done()

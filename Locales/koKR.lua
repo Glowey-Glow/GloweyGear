@@ -305,3 +305,10 @@ L["%s in the options has a box for each stat your spec's weights use: type your 
 L["Works without Daylight UI: its settings are in Glowey's settings (/glowey). In Blizzard Style the Upgrades for Sale window docks flush beside the Auction House."] = "Daylight UI 없이도 작동합니다: 설정은 Glowey 설정(/glowey)에 있습니다. 블리자드 스타일에서는 판매 중인 상위 장비 창이 경매장 옆에 딱 붙습니다."
 L["Your Own Stat Weights"] = "내 능력치 가중치"
 L["Your own stat weights: the Stat Weights page in Gear's options has a box for each stat. Change any; the rest keep Glowey's recommendation, and Revert puts yours back."] = "내 능력치 가중치: 장비 설정의 능력치 가중치 페이지에 능력치마다 입력 칸이 있습니다. 원하는 것을 바꾸세요. 나머지는 Glowey의 추천을 유지하며, 되돌리기로 내 값을 되돌립니다."
+
+-- The comparison beside the Upgrades for Sale list (CompareTip.lua, 2026-11-24)
+L["In Your Bags"] = "가방에 있음"
+
+-- What's New (2026-11-24)
+L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."] = "비교 툴팁: 판매 중인 업그레이드에서 아이템에 마우스를 올리면 그것이 대체할 장비가 옆에 능력치 변화와 함께 표시됩니다."
+L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."] = "경매장 애드온과 함께 작동: AuctionMaster, AHDB, Auctioneer, ForeverForge Auction의 전체 검색으로 목록이 채워지고, Auctionator, TSM, Oribos Exchange와 함께 있어도 Gear 자체 검색을 다시 쓸 수 있습니다."

@@ -305,3 +305,10 @@ L["%s in the options has a box for each stat your spec's weights use: type your 
 L["Works without Daylight UI: its settings are in Glowey's settings (/glowey). In Blizzard Style the Upgrades for Sale window docks flush beside the Auction House."] = "无需Daylight UI也能使用：其设置位于 Glowey 的设置（/glowey）中。在暴雪风格下，“在售的提升装备”窗口会紧贴在拍卖行旁边。"
 L["Your Own Stat Weights"] = "你自己的属性权重"
 L["Your own stat weights: the Stat Weights page in Gear's options has a box for each stat. Change any; the rest keep Glowey's recommendation, and Revert puts yours back."] = "你自己的属性权重：装备选项中的“属性权重”页面为每项属性提供一个输入框。可任意修改；其余保留 Glowey 的推荐，“还原”可将你的还原。"
+
+-- The comparison beside the Upgrades for Sale list (CompareTip.lua, 2026-11-24)
+L["In Your Bags"] = "在你的背包中"
+
+-- What's New (2026-11-24)
+L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."] = "对比提示：将鼠标悬停在“在售升级”中的物品上，它将替换的装备会显示在旁边，并附带属性变化。"
+L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."] = "与你的拍卖行插件配合：AuctionMaster、AHDB、Auctioneer 和 ForeverForge Auction 的完整扫描会填充列表，与 Auctionator、TSM 和 Oribos Exchange 同时使用时也能再次使用 Gear 自己的扫描。"

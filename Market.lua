@@ -1260,38 +1260,71 @@ local function MogulOwns()
 	return type(D) == "table" and D.ahMogul == true
 end
 
--- Other Auction House addons with a full scan of their own (the folder name -> its name for the
--- window). The game allows everybody together one full scan in about fifteen minutes, so while one
--- of these is installed and enabled for this character ours is not offered: its scan fills the
--- same list, and Gear reads that list whoever asked for it. Daylight UI's Auction House is not
--- here: DuiAH() above knows whether its window (and so its Full Scan) is the one in use.
+-- Other Auction House addons whose full scan asks for the game's whole-house list (the folder ->
+-- its name for the window). That list is the one Gear reads, whoever asked for it, and the game
+-- allows everybody together one such ask in about fifteen minutes: so while one of these is
+-- installed and enabled for this character, ours is not offered and its scan is the way. Daylight
+-- UI's Auction House is not here: DuiAH() above knows whether its window (and so its Full Scan) is
+-- the one in use. Read from each addon's own code (2026-11-24 downloads):
+--   Auctionator 353          Source_ModernAH/FullScan/Mixins/Frame.lua:19-49 ReplicateItems, but
+--                            only with its "replicate scan" option on (Source/Config/Main.lua:12, :89:
+--                            replicate_scan_3, off by default); otherwise its scan is a browse
+--                            (IncrementalScan), which never fills the list: then ours is offered.
+--   AuctionMaster 11.8.4     src/scan/Scan.lua:691 ReplicateItems (its scan button)
+--   AHDB 2.8.3 (AuctionDB)   Scan.lua:77 ReplicateItems, by itself on opening the house (on by default)
+--   Auctioneer 4.0.9         CoreScan.lua:580, :756-757 every scan is ReplicateItems
+--   ForeverForge Auction     Market.lua:1328-1347 ReplicateItems, 3 s after opening (on by default)
+-- Not here, as their prices don't come from such a scan: TradeSkillMaster (its DB prices come from
+-- the TSM desktop app; LibTSMService/Source/Auction/Internal/FullScan.lua:48-50 returns early on
+-- this client) and Oribos Exchange (its data ships with the addon; it sends no Auction House
+-- requests).
+local function AuctionatorReplicates()
+	local A = rawget(_G, "Auctionator")
+	local C = type(A) == "table" and A.Config or nil
+	if type(C) ~= "table" or type(C.Get) ~= "function" or type(C.Options) ~= "table" or C.Options.REPLICATE_SCAN == nil then
+		return true     -- (not loaded yet, or another version: counted, as before)
+	end
+	local ok, on = pcall(C.Get, C.Options.REPLICATE_SCAN)
+	if not ok then return true end
+	return on == true
+end
+
 local SCANNERS = {
 	{ "DaylightMogul", "Daylight Mogul" },
-	{ "Auctionator", "Auctionator" },
+	{ "Auctionator", "Auctionator", AuctionatorReplicates },
 	{ "AuctionLite", "AuctionLite" },
+	{ "AuctionMaster", "AuctionMaster" },
+	{ "AuctionDB", "Auction House DataBase" },
+	{ "Auc-Advanced", "Auctioneer" },
+	{ "ForeverForge_Auction", "ForeverForge Auction" },
 }
 Market.SCANNERS = SCANNERS
 
--- The names of the ones installed and enabled for this character, in SCANNERS' order (read once:
--- an addon switched on or off counts from the next reload, as the game loads it). `again` reads anew.
+-- The names of the ones installed and enabled for this character, in SCANNERS' order (installed is
+-- read once: an addon switched on or off counts from the next reload, as the game loads it; `again`
+-- reads anew). An option that decides whether it fills the list (Auctionator's) is read each time.
 local scanners
 function Market.Others(again)
-	if scanners and not again then return scanners end
-	scanners = {}
-	local A = C_AddOns
-	if type(A) ~= "table" or type(A.DoesAddOnExist) ~= "function" or type(A.GetAddOnEnableState) ~= "function" then
-		return scanners
-	end
-	local okN, who = pcall(UnitName, "player")
-	who = okN and plain(who) or nil
-	for _, s in ipairs(SCANNERS) do
-		local okE, exists = pcall(A.DoesAddOnExist, s[1])
-		if okE and exists then
-			local okS, state = pcall(A.GetAddOnEnableState, s[1], who)
-			if okS and type(state) == "number" and state > 0 then scanners[#scanners + 1] = s[2] end
+	if not scanners or again then
+		scanners = {}
+		local A = C_AddOns
+		if type(A) == "table" and type(A.DoesAddOnExist) == "function" and type(A.GetAddOnEnableState) == "function" then
+			local okN, who = pcall(UnitName, "player")
+			who = okN and plain(who) or nil
+			for _, sc in ipairs(SCANNERS) do
+				local okE, exists = pcall(A.DoesAddOnExist, sc[1])
+				if okE and exists then
+					local okS, state = pcall(A.GetAddOnEnableState, sc[1], who)
+					if okS and type(state) == "number" and state > 0 then scanners[#scanners + 1] = sc end
+				end
+			end
 		end
 	end
-	return scanners
+	local names = {}
+	for _, sc in ipairs(scanners) do
+		if not sc[3] or sc[3]() then names[#names + 1] = sc[2] end
+	end
+	return names
 end
 
 function Market.CanScan()

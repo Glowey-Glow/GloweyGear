@@ -6,9 +6,9 @@ By Glowey. A standalone addon that **integrates with Daylight UI** when it's ins
 
 ---
 
-## New in 1.1.1
-- **Stale lists say so:** a list read more than a day ago reads "Stale: List read 30 h ago.", so you know to scan again.
-- **Smoother at the Auction House:** the scan reads each page over a few frames, the sliders rearrange the list once a frame, and looting no longer rereads your gear when none moved. Old roll data is dropped after 30 days.
+## New in 1.2.0
+- **Comparison tooltips:** hover an item in Upgrades for Sale and the piece it replaces shows beside it, headed **Equipped** or **In Your Bags**, with the game's list of stat changes. Holding Shift still shows the game's own comparison, on the other side.
+- **Works with your Auction House addon:** while AuctionMaster, AHDB, Auctioneer or ForeverForge Auction is installed (or Auctionator with its whole-house scan on), their full scan is the way and Gear reads the list it fetches. Auctionator on its default scan, TSM and Oribos Exchange no longer hide Gear's own scan.
 ---
 
 ## What's in it
@@ -16,10 +16,11 @@ By Glowey. A standalone addon that **integrates with Daylight UI** when it's ins
 ### Upgrades for Sale
 - **The best upgrade on the Auction House for every gear slot**, with its price and how much better it is than what you own ("+12%", "Far Better" when a percent would be meaningless, or "Empty Slot" when you have nothing there). Select a slot to see up to ten alternatives.
 - **Most per Gold or Biggest Gain:** rank by the most improvement for each gold spent, or by the biggest improvement within your max price. **Max Price per Item** keeps it within what you want to spend.
-- **No scan of its own:** it reads the auctions Daylight UI's **Full scan** fetched, and keeps the gear list for each Auction House, so the window also works away from it.
+- **Reads the scan you already run:** the auctions Daylight UI's **Full scan** fetched, or the full scan of Auctionator, AuctionMaster, AHDB, Auctioneer or ForeverForge Auction; without one, **Scan the Auction House** goes through the weapon and armor pages itself. It keeps the gear list for each Auction House, so the window also works away from it.
 - **Click an item** (or press A on a controller) to search it on the Buy page of Daylight UI's Auction House. **It never buys anything for you.**
 - **Prices stay true after the scan.** Whenever you look at an item in the Auction House, its row gets the current price, and items that sold out drop off the list. **Check Prices** looks up everything shown, one item at a time.
 - **Weapon pairs:** a main hand and an off hand that are the better buy together get one row, priced as a set.
+- **Compare as you hover:** beside an item's tooltip, the piece it replaces (Equipped or In Your Bags) and the stat changes the swap makes.
 - **Docked** flush against Daylight UI's Auction House window while that is open (or the game's own Auction House window, if that's the one you use), with a fold tab; on its own anywhere else. Open it with `/gear`.
 
 ### Item tooltips
@@ -43,7 +44,7 @@ By Glowey. A standalone addon that **integrates with Daylight UI** when it's ins
 ## What it needs
 
 - Nothing else: **Daylight UI** 2.1 or later is optional.
-- For the Upgrades for Sale list: **a Full scan in Daylight UI's Auction House**. Without Daylight UI's Auction House in use, the window has a scan button of its own (the game allows one about every 15 minutes).
+- For the Upgrades for Sale list: **a Full scan in Daylight UI's Auction House**. Without it, a full scan by another Auction House addon, or the window's own **Scan the Auction House**.
 - For the bag mark: Daylight UI's bags.
 
 ---

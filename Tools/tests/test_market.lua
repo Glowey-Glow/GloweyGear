@@ -346,6 +346,23 @@ T.case("our own scan: only when allowed", function()
 	offered, reason = Market.CanScan()
 	T.eq(offered, false, "no scan of ours beside it"); T.eq(reason, "other", "and the reason says so")
 	T.eq((Market.Scan()), false, "Scan refuses too")
+	-- Auctionator fills the list only with its "replicate scan" option on (off by default)
+	rawset(_G, "Auctionator", { Config = { Options = { REPLICATE_SCAN = "replicate_scan_3" },
+		Get = function(name) return name == "replicate_scan_3" and w.replicate == true end } })
+	w.replicate = false
+	T.eq(#Market.Others(), 0, "its browse scan doesn't fill the list: not counted")
+	T.eq(Market.CanScan(), true, "so ours is offered")
+	w.replicate = true
+	T.eq(Market.Others()[1], "Auctionator", "its whole-house scan on: counted, read each time")
+	rawset(_G, "Auctionator", nil)
+	-- the others that ask for the whole-house list, and two that never do
+	w.addons = { AuctionMaster = 2, AuctionDB = 2, ["Auc-Advanced"] = 2, ForeverForge_Auction = 2,
+		TradeSkillMaster = 2, OribosExchange = 2 }
+	T.eq(table.concat(Market.Others(true), ","), "AuctionMaster,Auction House DataBase,Auctioneer,ForeverForge Auction",
+		"the scanners, not TSM nor Oribos Exchange")
+	w.addons = { TradeSkillMaster = 2, OribosExchange = 2 }
+	T.eq(#Market.Others(true), 0, "TSM and Oribos Exchange alone")
+	T.eq(Market.CanScan(), true, "ours is offered beside them")
 	w.addons = {}
 	Market.Others(true)
 	T.eq(Market.CanScan(), true, "gone again: ours is back")

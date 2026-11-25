@@ -40,6 +40,7 @@ Marks.lua
 Market.lua
 Sweep.lua
 Check.lua
+CompareTip.lua
 Window.lua
 Quest.lua
 Alert.lua

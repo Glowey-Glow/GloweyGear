@@ -15,6 +15,7 @@ rawset(_G, "ITEM_QUALITY_COLORS", {})
 rawset(_G, "GetMoneyString", function(copper) return copper .. "c" end)
 rawset(_G, "UISpecialFrames", {})
 rawset(_G, "DaylightUIAuctionHouse", false)
+w.load("CompareTip.lua")
 w.load("Window.lua")
 local Window, Market, Stats, Rank = NS.Window, NS.Market, NS.Stats, NS.Rank
 local ah = w.ah
@@ -590,8 +591,17 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	T.eq(followed.aim, chest, "the controller's cursor stays on the row pressed")
 	chest.scripts.OnEnter(chest)
 	T.check(tip:IsShown(), "hovering a row shows the item's tooltip")
+	-- beside it, the piece it replaces (CompareTip.lua)
+	local rep = chest.entry.row.replaces
+	T.check(rep ~= nil and rep.link ~= nil, "the chest row says what it replaces")
+	local ct
+	for _, fr in ipairs(w.frames_) do if fr.name == "GloweyGearCompareTip" then ct = fr end end
+	T.check(ct ~= nil and ct:IsShown(), "hovering shows the comparison beside the item's tooltip")
+	T.check(chest.UpdateTooltip ~= nil, "the row keeps it placed while hovered")
+	chest.UpdateTooltip(chest)
 	chest.scripts.OnLeave(chest)
 	T.check(not tip:IsShown(), "and leaving hides it")
+	T.check(not ct:IsShown(), "and the comparison with it")
 	chest:Click()
 	T.eq(Window.S.selected, nil, "a second click closes it"); T.eq(#Window.S.model, 2, "back to two rows")
 

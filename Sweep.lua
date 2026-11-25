@@ -281,7 +281,28 @@ end
 -- ---------------------------------------------------------------------------------------------
 local mine = false -- a message of ours is being sent (the hook below tells ours from others')
 
-local function changed() ns.Fire("SweepChanged") end
+-- AHDB (folder AuctionDB) holds its own Auction House requests while another addon's run: it
+-- reads AuctionDB.ahBusy (AHDB 2.8.3 Scan.lua:291-296, Live.lua:267 "Other add-ons can also set
+-- AuctionDB.ahBusy while they use the AH"); the client keeps only the newest pending request, so
+-- one of the two would go unanswered. Set while our sweep sends (not while it saves), and cleared
+-- only when we were the ones to set it.
+local weSetBusy = false
+local function TellAHDB()
+	local A = rawget(_G, "AuctionDB")
+	if type(A) ~= "table" or type(A.LastPrice) ~= "function" then return end
+	local busy = Sweep.Running() and s.step ~= "save"
+	if busy and not A.ahBusy then
+		A.ahBusy, weSetBusy = true, true
+	elseif not busy and weSetBusy then
+		weSetBusy = false
+		if A.ahBusy == true then A.ahBusy = nil end
+	end
+end
+
+local function changed()
+	TellAHDB()
+	ns.Fire("SweepChanged")
+end
 local function moved() ns.Fire("SweepProgress") end
 
 local function RequiredLevel(a, k)

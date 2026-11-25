@@ -25,6 +25,10 @@ local BAGS = L["A green plus on bag and bank slots that hold an upgrade."]
 -- them again). The first version's notes only ever show from that button: a new player gets
 -- the welcome, which marks them as read.
 local NEWS = {
+	{ version = "1.2.0", lines = {
+		L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."],
+		L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."],
+	} },
 	{ version = "1.1.0", lines = {
 		L["Your own stat weights: the Stat Weights page in Gear's options has a box for each stat. Change any; the rest keep Glowey's recommendation, and Revert puts yours back."],
 		L["Works without Daylight UI: its settings are in Glowey's settings (/glowey). In Blizzard Style the Upgrades for Sale window docks flush beside the Auction House."],

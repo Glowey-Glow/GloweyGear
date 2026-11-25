@@ -109,10 +109,15 @@ function Window.Model(view, selected, set)
 				isSet = true, name = L["Both Together"], link = m.link, price = set.price, gain = set.gain,
 				pct = set.pct, far = set.far, empty = set.empty, main = m, off = o } }
 			if open then
+				-- (A pair is weighed against the hands as they are, so each hand's row compares with
+				-- what that hand holds now: CompareTip.lua.)
+				local inMain, inOff = Game.WornLink(16), Game.WornLink(17)
 				out[#out + 1] = { kind = "alt", group = "WEAPONS", row = { key = m.key, link = m.link, name = m.name,
-					quality = m.quality, price = m.price, checkedAt = m.checkedAt, label = HandName("MAINHAND") } }
+					quality = m.quality, price = m.price, checkedAt = m.checkedAt, label = HandName("MAINHAND"),
+					replaces = inMain and { link = inMain } or nil } }
 				out[#out + 1] = { kind = "alt", group = "WEAPONS", row = { key = o.key, link = o.link, name = o.name,
-					quality = o.quality, price = o.price, checkedAt = o.checkedAt, label = HandName("OFFHAND") } }
+					quality = o.quality, price = o.price, checkedAt = o.checkedAt, label = HandName("OFFHAND"),
+					replaces = inOff and { link = inOff } or nil } }
 			end
 		end
 	end
@@ -972,9 +977,13 @@ local function RowEnter(self)
 		GameTooltip:AddDoubleLine(HandName("MAINHAND"), e.row.main.name or "", lr, lg, lb, QualityColor(e.row.main.quality))
 		GameTooltip:AddDoubleLine(HandName("OFFHAND"), e.row.off.name or "", lr, lg, lb, QualityColor(e.row.off.quality))
 		GameTooltip:Show()
+		ns.CompareTip.Hide()
 		return
 	end
-	if not pcall(GameTooltip.SetHyperlink, GameTooltip, e.row.link) then return GameTooltip:Hide() end
+	if not pcall(GameTooltip.SetHyperlink, GameTooltip, e.row.link) then
+		ns.CompareTip.Hide()
+		return GameTooltip:Hide()
+	end
 	-- (A price a search confirmed since the scan says so, and how long ago.)
 	local checked = Window.CheckedText(e.row.checkedAt)
 	local lr, lg, lb = Rgb("LABEL", 0.72, 0.70, 0.66)
@@ -989,11 +998,20 @@ local function RowEnter(self)
 		GameTooltip:AddLine(L["Click: search for it in the Auction House"], r, g, b, true)
 	end
 	GameTooltip:Show()
+	-- (Beside it, the piece it replaces: CompareTip.lua.)
+	ns.CompareTip.Show(GameTooltip, e.row)
 end
 
 local function RowLeave(self)
 	self.hover:Hide()
+	ns.CompareTip.Hide()
 	GameTooltip:Hide()
+end
+
+-- (The game calls this 5 times a second while the row owns the tooltip: the comparison moves to
+-- the other side when the game's own, held Shift, takes this one.)
+local function RowUpdateTooltip()
+	if GameTooltip:IsShown() then ns.CompareTip.Place(GameTooltip) end
 end
 
 local function RowClick(self)
@@ -1037,6 +1055,7 @@ local function Row(i)
 	local okM, file = pcall(API.Media, "ui-chevron.png")
 	if okM and file then r.chev:SetTexture(file) end
 	r:SetScript("OnEnter", RowEnter)
+	r.UpdateTooltip = RowUpdateTooltip
 	r:SetScript("OnLeave", RowLeave)
 	r:SetScript("OnClick", RowClick)
 	rows[i] = r

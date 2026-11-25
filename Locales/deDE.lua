@@ -305,3 +305,10 @@ L["%s in the options has a box for each stat your spec's weights use: type your 
 L["Works without Daylight UI: its settings are in Glowey's settings (/glowey). In Blizzard Style the Upgrades for Sale window docks flush beside the Auction House."] = "Läuft auch ohne Daylight UI: Seine Einstellungen findet Ihr in den Einstellungen von Glowey (/glowey). Im Blizzard-Stil dockt das Fenster „Verbesserungen im Angebot“ bündig neben dem Auktionshaus an."
 L["Your Own Stat Weights"] = "Eure eigenen Wertgewichte"
 L["Your own stat weights: the Stat Weights page in Gear's options has a box for each stat. Change any; the rest keep Glowey's recommendation, and Revert puts yours back."] = "Eure eigenen Wertgewichte: Die Seite „Wertgewichte“ in den Optionen von Gear hat ein Feld für jeden Wert. Ändert beliebige; die übrigen behalten Gloweys Empfehlung, und „Rückgängig“ setzt Eure zurück."
+
+-- The comparison beside the Upgrades for Sale list (CompareTip.lua, 2026-11-24)
+L["In Your Bags"] = "In Euren Taschen"
+
+-- What's New (2026-11-24)
+L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."] = "Vergleichs-Tooltips: Fahrt mit der Maus über einen Gegenstand in „Verbesserungen im Angebot“, und das Teil, das er ersetzt, erscheint daneben, mit den Wertänderungen."
+L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."] = "Arbeitet mit Eurem Auktionshaus-Addon: Die vollständigen Scans von AuctionMaster, AHDB, Auctioneer und ForeverForge Auction füllen die Liste, und Gears eigener Scan ist neben Auctionator, TSM und Oribos Exchange wieder da."

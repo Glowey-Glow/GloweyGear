@@ -1,5 +1,12 @@
 # Glowey's Gear
 
+## 1.2.0
+- Comparison tooltips in the Upgrades for Sale list. Hovering an item now shows, beside its tooltip, the piece Gear says it replaces, headed "Equipped" when you wear it or "In Your Bags" when it's carried, with the game's own list of the stat changes the swap makes. For rings and trinkets that is the weaker of your two; under Both Together, each hand's row compares with what that hand holds now. An item that fills an empty slot shows none. Holding Shift still shows the game's own comparison with what you have equipped; Gear's then moves to the other side so both can be read.
+- Scan the Auction House now knows the Auction House addons that do a full scan of their own: AuctionMaster, Auction House DataBase (AHDB), Auctioneer and ForeverForge Auction, besides Daylight Mogul and Auctionator. While one of them is installed, its full scan is the way (Gear reads the list it fetches), as the game allows only one full scan in about fifteen minutes.
+- Auctionator only counts when its own full scan is set to read the whole house at once (its "replicate scan" option). By default it scans another way that Gear can't read, so Gear's own scan is offered beside it again.
+- TradeSkillMaster and Oribos Exchange never block Gear's scan: neither scans the whole house in game.
+- With AHDB installed, Gear's scan tells it the Auction House is in use, so AHDB's own requests wait instead of being dropped.
+
 ## 1.1.1
 - A list read more than a day ago says it's stale ("Stale: List read 30 h ago."), so you know to scan again: auctions run 12, 24 or 48 hours and most are posted for 24, so by then most of it has sold or run out.
 - Smoother at the Auction House: Scan the Auction House reads each page of results over a few frames instead of all at once, moving the Max Price per Item or Smallest Gain to Show setting arranges the list once a frame (and not at all while the window is closed), and looting or sorting your bags no longer reads your gear again when no gear moved.
