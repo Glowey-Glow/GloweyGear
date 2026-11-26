@@ -6,9 +6,10 @@ By Glowey. A standalone addon that **integrates with Daylight UI** when it's ins
 
 ---
 
-## New in 1.2.2
-- **Scan with Auctionator switched off:** Scan the Auction House is offered again when Auctionator (or another scanning addon) is installed but switched off for your character.
-- **Lighter:** the comparison tooltip and the window docked beside the Auction House no longer check anything every frame; they follow the changes instead.
+## New in 1.3.0
+- **Max Spend for All Slots:** a budget for the whole set of upgrades for sale. The picks fit it together, and Gear says what they cost, how many slots have an upgrade over it, and what to raise it to when nothing fits.
+- **Max Price per Item** can be typed in, in gold.
+- **Glowey's on the options rail:** with another of Glowey's plugins on, they all sit under one "Glowey's" entry.
 ---
 
 ## What's in it
