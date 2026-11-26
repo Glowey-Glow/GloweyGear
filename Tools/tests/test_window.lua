@@ -518,6 +518,19 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 		b.FitWidth = function(min) b:SetWidth(min or 90) end
 		return b
 	end
+	A.Input = function(parent)
+		local e = w.widget(parent)
+		e.focused = false
+		e.HasFocus = function() return e.focused end
+		e.SetFocus = function() e.focused = true end
+		e.ClearFocus = function()
+			if not e.focused then return end
+			e.focused = false
+			if e.lost then e.lost(e) end
+		end
+		e.HookScript = function(_, name, fn) if name == "OnEditFocusLost" then e.lost = fn end end
+		return e
+	end
 	A.Close = function(parent, onClick)
 		local b = w.widget(parent)
 		b:SetScript("OnClick", onClick)
@@ -609,6 +622,18 @@ T.case("the frames: built, placed and pressed on stand-in widgets", function()
 	w.set("maxPrice", 50)
 	f.plus:Click(); T.eq(NS.Get("maxPrice"), 75, "plus: the next step up")
 	f.minus:Click(); f.minus:Click(); T.eq(NS.Get("maxPrice"), 40, "minus: down")
+	-- an amount typed in a box, Enter: the setting (exact, off the ladder); empty is no limit
+	f.value:SetFocus(); f.value:SetText("123"); f.value.scripts.OnEnterPressed(f.value)
+	T.eq(NS.Get("maxPrice"), 123, "a typed max price is kept as typed")
+	T.check(not f.value:HasFocus(), "and the box lets go")
+	f.plus:Click(); T.eq(NS.Get("maxPrice"), 150, "plus from a typed amount: the next step up")
+	f.spend:SetFocus(); f.spend:SetText("750"); f.spend.scripts.OnEnterPressed(f.spend)
+	T.eq(NS.Get("maxSpend"), 750, "a typed max spend")
+	f.spendPlus:Click(); T.eq(NS.Get("maxSpend"), 1000, "its plus steps up")
+	f.spend:SetFocus(); f.spend:SetText(""); f.spend.scripts.OnEnterPressed(f.spend)
+	T.eq(NS.Get("maxSpend"), 0, "emptied: no limit")
+	f.value:SetFocus(); f.value:SetText("999"); f.value.scripts.OnEscapePressed(f.value)
+	T.eq(NS.Get("maxPrice"), 150, "Escape keeps the setting as it was")
 	f.mode:Click(); T.eq(NS.Get("mode"), "biggest", "the Best Pick button switches")
 	local tabs, at = f.padTabs()
 	T.eq(at, 2, "LB / RB know which is on"); tabs[1]:Click(); T.eq(NS.Get("mode"), "perGold", "and switch it")

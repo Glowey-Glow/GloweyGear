@@ -1,5 +1,10 @@
 # Glowey's Gear
 
+## 1.3.0
+- Max Spend for All Slots: a budget for the whole set of upgrades for sale. The picks fit it together, and it says what they cost of your budget, how many slots have an upgrade over it, and what to raise it to when nothing fits.
+- Max Price per Item can be typed in, in gold, like Max Spend.
+- With another of Glowey's plugins on, Gear's pages sit under one "Glowey's" entry on Daylight UI's options rail.
+
 ## 1.2.4
 - At the Auction House, item data coming in no longer throws away every kept bag and tooltip answer once a second: only the ones still waiting are worked out.
 - The welcome no longer keeps asking every 5 seconds for the whole session while Daylight UI is busy: it gives up after ten minutes and asks at the next login.

@@ -89,6 +89,37 @@ T.case("unusable items are never recommended", function()
 	T.eq(job.nParked, 0, "nothing parked"); T.eq(job:Done(), true, "done")
 end)
 
+T.case("max spend for all slots: the most gain for the gold, slot by slot", function()
+	-- Rows as Arrange keeps them (gain, price): Rank.Budget reads only those.
+	local function row(key, group, gain, price) return { key = key, name = key, group = group, gain = gain, price = price } end
+	local view = { over = {}, listed = 6, groups = {
+		HEAD = { row("HeadBig", "HEAD", 40, 100 * GOLD), row("HeadMid", "HEAD", 30, 40 * GOLD), row("HeadSmall", "HEAD", 10, 5 * GOLD) },
+		CHEST = { row("ChestBig", "CHEST", 50, 200 * GOLD), row("ChestSmall", "CHEST", 20, 10 * GOLD) },
+		FEET = { row("FeetDear", "FEET", 15, 300 * GOLD) },
+	} }
+	T.eq(Rank.Budget(view, 0), view, "0: the view as it is")
+	local b = Rank.Budget(view, 60 * GOLD)
+	T.eq(b.groups.HEAD[1].name, "HeadMid", "60g: the head's best buy within it")
+	T.eq(b.groups.CHEST[1].name, "ChestSmall", "and the chest's cheap one")
+	T.eq(b.groups.FEET, nil, "the dear feet left out")
+	T.eq(b.spend.nCut, 1, "one slot over it"); T.eq(b.spend.cut.FEET.name, "FeetDear", "with its best row")
+	T.check(b.spend.spent <= 60 * GOLD, "never over the budget: " .. b.spend.spent)
+	T.eq(b.spend.spent, 50 * GOLD, "40g and 10g")
+	T.eq(#b.groups.HEAD, 3, "the other rows stay as alternatives"); T.eq(b.groups.HEAD[2].name, "HeadBig", "in their order")
+	T.eq(view.groups.HEAD[1].name, "HeadBig", "the view given is not changed")
+	b = Rank.Budget(view, 1000 * GOLD)
+	T.eq(b.groups.HEAD[1].name, "HeadBig", "enough for everything: every slot's biggest")
+	T.eq(b.groups.CHEST[1].name, "ChestBig", "chest too"); T.eq(b.groups.FEET[1].name, "FeetDear", "feet too")
+	T.eq(b.spend.nCut, 0, "nothing left out")
+	b = Rank.Budget(view, 1 * GOLD)
+	T.eq(next(b.groups), nil, "under everything: no slot"); T.eq(b.spend.nCut, 3, "all three over it")
+	-- A row off the hull the steps went past: taken with the gold left.
+	view = { over = {}, listed = 2, groups = {
+		HEAD = { row("Cheap", "HEAD", 10, 1 * GOLD), row("Middle", "HEAD", 12, 50 * GOLD) } } }
+	b = Rank.Budget(view, 60 * GOLD)
+	T.eq(b.groups.HEAD[1].name, "Middle", "the gold left buys the bigger gain")
+end)
+
 T.case("max price is a hard ceiling", function()
 	local job = Rank.Job(world())
 	job:Add(piece("INVTYPE_HEAD", 30, { name = "Dear" }), 50 * GOLD + 1)

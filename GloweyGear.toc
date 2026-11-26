@@ -23,6 +23,7 @@ Locales\ruRU.lua
 Locales\koKR.lua
 Locales\zhCN.lua
 Host.lua
+Hub.lua
 Data\Weights.lua
 Data\Requirements.lua
 Game.lua

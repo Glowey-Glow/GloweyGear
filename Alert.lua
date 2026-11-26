@@ -111,7 +111,8 @@ function Alert.Check(view, owned)
 	-- Everything that changes which item is a slot's pick without anything new being for sale:
 	-- the options that filter the list, and what is owned. A change of any of them makes the
 	-- next look a silent one (the picks are only remembered).
-	local under = table.concat({ tostring(ns.Get("maxPrice")), tostring(ns.Get("minGain")), tostring(ns.Get("bestArmor")),
+	local under = table.concat({ tostring(ns.Get("maxPrice")), tostring(ns.Get("maxSpend")), tostring(ns.Get("minGain")),
+		tostring(ns.Get("bestArmor")),
 		tostring(who.level), tostring(owned),
 		-- (and the player's own stat weights: MyWeights.lua)
 		ns.MyWeights and ns.MyWeights.Signature(who.class, who.spec) or "" }, "|")

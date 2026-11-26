@@ -64,6 +64,7 @@ local Window = {}
 ns.Window = Window
 
 local WIDTH, EDGE = 340, 12
+local BOX_W = 64              -- a footer gold box: six digits
 local INNER = WIDTH - 2 * EDGE
 local MAX_LIST = 364          -- the list's height before it scrolls
 local SLICE_MS = 3            -- our own time in one frame: feeding, asking, scoring (a tick's overhead and the
@@ -234,6 +235,15 @@ function Window.EmptyState(f)
 	if (f.listed or 0) > 0 then return nil end
 	if f.fight then return "fight", L["Gear isn't checked during a fight. The list fills in when it ends."] end
 	if f.scoring then return "scoring", L["Scoring the items for sale: %d left."]:format(f.left or 0) end
+	-- (Max Spend for All Slots left every slot out: the cheapest pick it would take.)
+	if f.spend and (f.spend.nCut or 0) > 0 then
+		local cheapest
+		for _, row in pairs(f.spend.cut) do
+			if not cheapest or row.price < cheapest then cheapest = row.price end
+		end
+		local money = f.money or tostring
+		return "spend", L["No upgrades for sale fit your max spend for all slots. Raise it to %s to see one."]:format(money(cheapest))
+	end
 	if f.over then
 		local money = f.money or tostring
 		return "over", L["No upgrades for sale under your max price. Raise it to %s to see one."]:format(money(f.over))
@@ -276,7 +286,8 @@ function Window.DockSide(host, screenW, width)
 end
 
 -- Max Price moves along a ladder (gold), every step one the options page's slider can also
--- show (multiples of 5); past the top is "no limit" (0).
+-- show (multiples of 5); past the top is "no limit" (0). A typed amount off the ladder steps to
+-- the next one up or down.
 local LADDER = { 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 300, 500, 750, 1000 }
 function Window.StepPrice(gold, dir)
 	gold = tonumber(gold) or 0
@@ -292,6 +303,24 @@ function Window.StepPrice(gold, dir)
 		if LADDER[i] < gold then return LADDER[i] end
 	end
 	return LADDER[1]
+end
+
+-- Max Spend for All Slots: the same, on a ladder of its own (multiples of the slider's 50).
+local SPEND = { 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000 }
+function Window.StepSpend(gold, dir)
+	gold = tonumber(gold) or 0
+	if dir > 0 then
+		if gold <= 0 then return 0 end
+		for i = 1, #SPEND do
+			if SPEND[i] > gold then return SPEND[i] end
+		end
+		return 0
+	end
+	if gold <= 0 then return SPEND[#SPEND] end
+	for i = #SPEND, 1, -1 do
+		if SPEND[i] < gold then return SPEND[i] end
+	end
+	return SPEND[1]
 end
 
 -- The words searched for: the item's whole name, its suffix included ("Jade Ring of the Bear"),
@@ -385,8 +414,14 @@ local function Shown() return Window.IsShown() end
 -- The rows to draw, from the view in place: the list's own, and the weapon pair when there is one.
 local function Remodel()
 	local job = S.job
-	S.set = (job and S.view) and Rank.Set(job, ns.RankOptions(job.ctx.level), S.view) or nil
-	S.model = Window.Model(S.view, S.selected, S.set)
+	local opts = job and ns.RankOptions(job.ctx.level)
+	S.set = (job and S.view) and Rank.Set(job, opts, S.view) or nil
+	-- Max Spend for All Slots: every slot's pick within it (Rank.Budget); the weapon pair only
+	-- when it fits it on its own.
+	local spend = opts and opts.maxSpend or 0
+	S.shown = spend > 0 and Rank.Budget(S.view, spend) or S.view
+	if S.set and spend > 0 and S.set.price > spend then S.set = nil end
+	S.model = Window.Model(S.shown, S.selected, S.set)
 end
 
 -- The exact arrangement of everything found, and a paint. Cheap enough for a control change
@@ -725,7 +760,7 @@ end
 Window.RearrangeSoon = RearrangeSoon
 
 ns.On("Setting", function(path)
-	if path == "maxPrice" or path == "minGain" or path == "mode" then
+	if path == "maxPrice" or path == "maxSpend" or path == "minGain" or path == "mode" then
 		RearrangeSoon()
 	elseif path == "dock" then
 		Place()
@@ -1152,7 +1187,8 @@ local function Facts()
 		-- (Listings never read, of items that do have another listing in the list; not while
 		-- the tail is still reading them.)
 		unreadRows = (ns.Market.Saved() and not ns.Market.Tail()) and ns.Market.Saved().lostRows or 0,
-		listed = S.view and S.view.listed or 0, over = Window.Over(S.view), money = Money,
+		listed = (S.shown or S.view) and (S.shown or S.view).listed or 0, over = Window.Over(S.view), money = Money,
+		spend = S.shown and S.shown.spend or nil,
 	}
 end
 Window.Facts = Facts
@@ -1180,6 +1216,15 @@ local function SubText(facts)
 	if (facts.gone or 0) > 0 then
 		parts[#parts + 1] = ns.Plural(facts.gone, L["%d is no longer for sale."], L["%d are no longer for sale."],
 			L["%d are no longer for sale.#few"])
+	end
+	-- (Max Spend for All Slots: what the picks cost together, and the slots it left out.)
+	local spend = facts.spend
+	if spend then
+		parts[#parts + 1] = L["The picks cost %s of your %s max spend."]:format(Money(spend.spent), Money(spend.budget))
+		if (spend.nCut or 0) > 0 then
+			parts[#parts + 1] = ns.Plural(spend.nCut, L["%d more slot has an upgrade over it."],
+				L["%d more slots have an upgrade over it."], L["%d more slots have an upgrade over it.#few"])
+		end
 	end
 	local checking, done, total = false, 0, 0
 	if ns.Check then checking, done, total = ns.Check.State() end
@@ -1306,18 +1351,22 @@ local function LayoutFoot(f, C)
 	ink(f.modeLabel, C.LABEL)
 	y = y + FootLine(f, f.modeLabel, f.mode, f.mode:GetWidth(), y)
 
-	local gold = tonumber(ns.Get("maxPrice")) or 0
-	f.value:SetText(gold > 0 and Money(gold * 10000) or L["No Limit"])
-	ink(f.value, C.VALUE)
-	local valueW = math.max(64, math.ceil(f.value:GetStringWidth() or 0) + 12)
-	f.value:SetWidth(valueW)
-	f.plus:ClearAllPoints()
-	f.value:ClearAllPoints()
-	f.value:SetPoint("RIGHT", f.plus, "LEFT", 0, 0)
-	f.minus:ClearAllPoints()
-	f.minus:SetPoint("RIGHT", f.value, "LEFT", 0, 0)
-	ink(f.priceLabel, C.LABEL)
-	y = y + FootLine(f, f.priceLabel, f.plus, 26 + valueW + 26, y)
+	-- Max Spend for All Slots, then Max Price per Item: each a box that takes the gold typed
+	-- (Enter sets it; empty or 0 is no limit) between - and + (a press steps along a ladder).
+	local function Amount(box, label, minus, plus, key)
+		local gold = tonumber(ns.Get(key)) or 0
+		if not box:HasFocus() then box:SetText(gold > 0 and tostring(math.floor(gold)) or "") end
+		box:SetWidth(BOX_W)
+		plus:ClearAllPoints()
+		box:ClearAllPoints()
+		box:SetPoint("RIGHT", plus, "LEFT", -2, 0)
+		minus:ClearAllPoints()
+		minus:SetPoint("RIGHT", box, "LEFT", -2, 0)
+		ink(label, C.LABEL)
+		return FootLine(f, label, plus, 26 + BOX_W + 26 + 4, y)
+	end
+	y = y + Amount(f.spend, f.spendLabel, f.spendMinus, f.spendPlus, "maxSpend")
+	y = y + Amount(f.value, f.priceLabel, f.minus, f.plus, "maxPrice")
 	return y + 6
 end
 
@@ -1464,6 +1513,30 @@ end
 local function StepPrice(dir)
 	SetSetting("maxPrice", Window.StepPrice(ns.Get("maxPrice"), dir))
 end
+local function StepSpend(dir)
+	SetSetting("maxSpend", Window.StepSpend(ns.Get("maxSpend"), dir))
+end
+
+-- A footer box that takes an amount of gold for a setting: Enter sets what was typed (empty: 0,
+-- no limit), Escape or leaving it puts the setting's value back.
+local function GoldBox(f, key, hint)
+	local box = API.Input(f, { numeric = true, hint = hint })
+	box:SetHeight(22)
+	if box.SetMaxLetters then box:SetMaxLetters(6) end
+	if box.SetJustifyH then box:SetJustifyH("CENTER") end
+	box:SetScript("OnEnterPressed", function(self)
+		local gold = tonumber(self:GetText()) or 0
+		self:ClearFocus()
+		if gold ~= (tonumber(ns.Get(key)) or 0) then SetSetting(key, math.max(0, math.floor(gold))) end
+		Paint()
+	end)
+	box:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+		Paint()
+	end)
+	box:HookScript("OnEditFocusLost", function() Paint() end)
+	return box
+end
 
 local function SetMode(mode)
 	if ns.Get("mode") ~= mode then SetSetting("mode", mode) end
@@ -1599,14 +1672,23 @@ local function Build()
 	f.line:SetColorTexture(1, 1, 1, 0.06)
 
 	f.priceLabel = API.Text(f, "small", "LEFT")
-	f.priceLabel:SetText(L["Max Price"])
+	f.priceLabel:SetText(L["Max Price per Item"])
 	f.minus = API.Button(f, "-", 22)
 	f.minus:SetWidth(26)
 	f.minus:SetScript("OnClick", function() StepPrice(-1) end)
 	f.plus = API.Button(f, "+", 22)
 	f.plus:SetWidth(26)
 	f.plus:SetScript("OnClick", function() StepPrice(1) end)
-	f.value = API.Text(f, "body", "CENTER")
+	f.value = GoldBox(f, "maxPrice", L["No Limit"])
+	f.spendLabel = API.Text(f, "small", "LEFT")
+	f.spendLabel:SetText(L["Max Spend for All Slots"])
+	f.spendMinus = API.Button(f, "-", 22)
+	f.spendMinus:SetWidth(26)
+	f.spendMinus:SetScript("OnClick", function() StepSpend(-1) end)
+	f.spendPlus = API.Button(f, "+", 22)
+	f.spendPlus:SetWidth(26)
+	f.spendPlus:SetScript("OnClick", function() StepSpend(1) end)
+	f.spend = GoldBox(f, "maxSpend", L["No Limit"])
 	f.modeLabel = API.Text(f, "small", "LEFT")
 	f.modeLabel:SetText(L["Best Pick"])
 	f.mode = API.Button(f, "", 22)

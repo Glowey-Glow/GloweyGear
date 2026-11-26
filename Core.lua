@@ -137,6 +137,7 @@ local DEFAULTS = {
 	minGain = 3,            -- percent: smaller gains are not shown
 	bestArmor = false,      -- only the heaviest armor type the class wears now
 	maxPrice = 50,          -- gold per item; 0 = no limit
+	maxSpend = 0,           -- gold for every slot's pick together; 0 = no limit (Rank.Budget)
 	mode = "perGold",       -- "perGold" | "biggest"
 	tooltips = true,        -- (second half) a row on item tooltips
 	bagMarks = true,        -- (second half) a corner mark on bag slots
@@ -184,6 +185,7 @@ end
 -- The ranking options as Rank.Arrange takes them.
 function ns.RankOptions(level)
 	return { mode = ns.Get("mode"), maxPrice = (tonumber(ns.Get("maxPrice")) or 0) * 10000,
+		maxSpend = (tonumber(ns.Get("maxSpend")) or 0) * 10000,
 		minPct = tonumber(ns.Get("minGain")) or 0, level = level, alternatives = 10 }
 end
 
@@ -731,8 +733,13 @@ local pages = {
 			  desc = L["Leaves out armor lighter than the heaviest type your class wears at your level."], disabled = Off },
 		} },
 		{ label = L["Upgrades for Sale"], items = {
-			{ type = "slider", key = "maxPrice", label = L["Max Price per Item"], min = 0, max = 1000, step = 5,
-			  desc = L["In gold. Items that cost more are never suggested. 0 means no limit."], disabled = Off },
+			-- (free: the value typed in the slider's box is kept as typed, not snapped to its step.)
+			{ type = "slider", key = "maxPrice", label = L["Max Price per Item"], min = 0, max = 5000, step = 5, free = true,
+			  desc = L["In gold. Items that cost more are never suggested. 0 means no limit. Type an amount in the box, or drag."],
+			  disabled = Off },
+			{ type = "slider", key = "maxSpend", label = L["Max Spend for All Slots"], min = 0, max = 50000, step = 50, free = true,
+			  desc = L["In gold: what the picks for all your slots may cost together. The most gain for the gold is picked, slot by slot. 0 means no limit."],
+			  disabled = Off },
 			{ type = "dropdown", key = "mode", label = L["Best Pick"], values = MODES, order = { "perGold", "biggest" },
 			  desc = L["Most per Gold: the most improvement for each gold spent. Biggest Gain: the biggest improvement within your max price."],
 			  disabled = Off },
@@ -788,15 +795,27 @@ if ns.UpdateGroup then table.insert(pages[1].groups, ns.UpdateGroup()) end
 if ns.Guide and ns.Guide.HelpGroup then table.insert(pages[1].groups, ns.Guide.HelpGroup()) end
 
 local ok, err = pcall(function()
-	DUI:RegisterPlugin(ADDON, {
-		title = "Glowey's Gear",
-		icon = "Interface\\AddOns\\" .. ADDON .. "\\Media\\icon-glyph.png",
-		needs = { 1, 12 },
-		short = L["Gear"],
-		color = { 0.37, 0.83, 0.55 },
-		blurb = L["Gear advice for your spec, and the best upgrades for sale by improvement per gold."],
-	})
-	DUI:RegisterModule(ADDON, { plugin = ADDON, label = L["Gear"], defaults = DEFAULTS, options = { pages = pages } })
+	-- (With Daylight UI and another of Glowey's plugins on, its pages go under one "Glowey's" entry
+	-- on the options rail: Hub.lua.)
+	local spec = { addon = ADDON, dui = DUI,
+		plugin = {
+			title = "Glowey's Gear",
+			icon = "Interface\\AddOns\\" .. ADDON .. "\\Media\\icon-glyph.png",
+			needs = { 1, 12 },
+			short = L["Gear"],
+			color = { 0.37, 0.83, 0.55 },
+			blurb = L["Gear advice for your spec, and the best upgrades for sale by improvement per gold."],
+		},
+		module = { plugin = ADDON, label = L["Gear"], defaults = DEFAULTS, options = { pages = pages } },
+		words = { open = L["Open"], pages = L["Its settings, a page each."] },
+		hubIcon = "Interface\\AddOns\\" .. ADDON .. "\\Media\\glowey-hub.png",
+		hubBlurb = L["Glowey's plugins, in one place."],
+		hubDesc = L["Glowey's plugins, in one place."],
+	}
+	if ns.Hub then ns.Hub.Join(spec) else
+		DUI:RegisterPlugin(ADDON, spec.plugin)
+		DUI:RegisterModule(ADDON, spec.module)
+	end
 end)
 if not ok then geterrorhandler()(err) end
 

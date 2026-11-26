@@ -31,6 +31,7 @@
 --                 minPct = number, level = number, alternatives = 10 }
 --        view = { groups = { [group] = { row, row, ... } }, listed = n,
 --                 over = { [group] = row } }   the biggest upgrade that only the max price hides
+--   Rank.Budget(view, copper)      -> view          every slot's pick within Max Spend for All Slots
 --   Rank.Live(opts)                -> live          live:Offer(row), live:View(rows), live.changed
 --   Rank.Value(gain, price, level) -> gain per gold
 --   Rank.Pocket(level)             -> copper
@@ -157,6 +158,117 @@ function Rank.Arrange(rows, opts)
 		view.listed = view.listed + #list
 	end
 	return view
+end
+
+-- ---------------------------------------------------------------------------------------------
+-- Budget: Max Spend for All Slots
+-- ---------------------------------------------------------------------------------------------
+-- Rank.Budget(view, budget) -> view   budget in copper (0 or nil: the view as it is)
+-- What every slot's pick costs together is kept within `budget`: the picks that give the most
+-- gain for the gold, slot by slot. A slot's choices are its rows (each within Max Price per
+-- Item already) or nothing; the answer is the classic "one choice per slot" fill:
+--   1. Per slot, only the rows worth having: cheapest first, each one a bigger gain than every
+--      cheaper one (a dearer row that gains less is never the better buy), then only those on
+--      the upper hull (each step up costs more per point of gain than the one before), so a
+--      slot's steps come in falling gain per gold.
+--   2. Every slot's steps together, the best gain per gold first: a step is taken when it is
+--      that slot's next one and the gold left covers it. (Steps of one slot stay in order, so a
+--      slot is never asked to jump.)
+--   3. With gold left, each slot once more takes the best gain it can afford outright (a row
+--      off the hull the steps went past).
+-- The chosen row goes first in its slot's list (its alternatives after it, in their order); a
+-- slot left with nothing goes to `cut` (its best row, for "N more slots over your max spend").
+-- view.spend = { budget, spent, cut = { [group] = row }, nCut }. Never changes the view given.
+local function Hull(list)
+	local byPrice = {}
+	for i = 1, #list do byPrice[i] = list[i] end
+	table.sort(byPrice, function(a, b)
+		if a.price ~= b.price then return a.price < b.price end
+		if a.gain ~= b.gain then return a.gain > b.gain end
+		return a.key < b.key
+	end)
+	local front = {}
+	for _, row in ipairs(byPrice) do
+		if row.gain > 0 and (#front == 0 or row.gain > front[#front].gain) then front[#front + 1] = row end
+	end
+	-- The upper hull from "nothing" (0 gold, 0 gain).
+	local hull = {}
+	local function slope(a, b)
+		local pa, ga = a and a.price or 0, a and a.gain or 0
+		local dp = b.price - pa
+		if dp <= 0 then return math.huge end
+		return (b.gain - ga) / dp
+	end
+	for _, row in ipairs(front) do
+		while #hull >= 1 and slope(hull[#hull - 1], hull[#hull]) <= slope(hull[#hull], row) do
+			hull[#hull] = nil
+		end
+		hull[#hull + 1] = row
+	end
+	return hull, front
+end
+
+function Rank.Budget(view, budget)
+	budget = tonumber(budget) or 0
+	if budget <= 0 or type(view) ~= "table" or type(view.groups) ~= "table" then return view end
+	local hulls, fronts, steps = {}, {}, {}
+	for group, list in pairs(view.groups) do
+		local hull, front = Hull(list)
+		hulls[group], fronts[group] = hull, front
+		for i, row in ipairs(hull) do
+			local prev = hull[i - 1]
+			local dp = row.price - (prev and prev.price or 0)
+			local dg = row.gain - (prev and prev.gain or 0)
+			steps[#steps + 1] = { group = group, i = i, dp = dp, dg = dg,
+				eff = dp > 0 and dg / dp or math.huge, key = row.key }
+		end
+	end
+	table.sort(steps, function(a, b)
+		if a.eff ~= b.eff then return a.eff > b.eff end
+		if a.group ~= b.group then return a.group < b.group end
+		return a.i < b.i
+	end)
+	local at, pick, left = {}, {}, budget
+	for _, st in ipairs(steps) do
+		if (at[st.group] or 0) == st.i - 1 and st.dp <= left then
+			at[st.group] = st.i
+			pick[st.group] = hulls[st.group][st.i]
+			left = left - st.dp
+		end
+	end
+	-- (Gold left: a slot takes the best gain it can afford outright, in a fixed order.)
+	local groups = {}
+	for group in pairs(view.groups) do groups[#groups + 1] = group end
+	table.sort(groups)
+	for _, group in ipairs(groups) do
+		local cur = pick[group]
+		local room = left + (cur and cur.price or 0)
+		local best = cur
+		for _, row in ipairs(fronts[group]) do
+			if row.price <= room and (not best or row.gain > best.gain) then best = row end
+		end
+		if best ~= cur then
+			left = room - best.price
+			pick[group] = best
+		end
+	end
+	local out = { groups = {}, over = view.over, listed = 0,
+		spend = { budget = budget, spent = budget - left, cut = {}, nCut = 0 } }
+	for group, list in pairs(view.groups) do
+		local chosen = pick[group]
+		if chosen then
+			local copy = { chosen }
+			for _, row in ipairs(list) do
+				if row ~= chosen then copy[#copy + 1] = row end
+			end
+			out.groups[group] = copy
+			out.listed = out.listed + #copy
+		elseif list[1] then
+			out.spend.cut[group] = list[1]
+			out.spend.nCut = out.spend.nCut + 1
+		end
+	end
+	return out
 end
 
 -- ---------------------------------------------------------------------------------------------
