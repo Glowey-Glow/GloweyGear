@@ -1,5 +1,11 @@
 # Glowey's Gear
 
+## 1.2.3
+- Settings dropdowns no longer catch the click outside them: a click on a data text, an addon drawer or anything else closes the menu and reaches what you clicked the first time.
+- An error in placing Upgrades for Sale beside the Auction House is caught, so the Auction House window's own moves and shows go on.
+- After Escape closes a tour card, the card no longer keeps your keys to itself (it could stop movement keys in a later fight).
+- BugSack reports now end with this addon's name and version on its own errors, so a report says which version it came from.
+
 ## 1.2.2
 - Scan the Auction House is offered again with Auctionator (or another scanning addon) installed but switched off. Gear asked the addon list by your character's name, which this client answers for all characters, so a switched-off Auctionator still counted and Gear's own scan stayed hidden. It now counts only a scanning addon that is loaded (or one that loads on demand and is on for this character).
 - Lighter: the comparison beside an item no longer re-places itself on every frame (it moves only when Shift or the game's own comparison changes it), the Upgrades for Sale window no longer checks the Auction House window's position every frame while it's open, and the login question no longer re-asks every 3 seconds forever while you're busy.

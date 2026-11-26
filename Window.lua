@@ -1841,18 +1841,22 @@ local function Watch()
 	if not host and not ns.Market.IsOpen() then watching = false end
 end
 
+-- (Run from hooks on Daylight UI's, the game's and UIParent's own calls: an error here would go
+-- back to whoever called SetPoint or SetAlpha and cut its work short, so it is caught.)
+local function SafeWatch() pcall(Watch) end
+
 local function HookHost(f)
 	if type(f) ~= "table" or hostHooked[f] then return end
 	hostHooked[f] = true
 	local hook = rawget(_G, "hooksecurefunc")
 	if hook then
 		for _, method in ipairs({ "SetPoint", "SetAlpha", "SetScale", "StopMovingOrSizing" }) do
-			if type(f[method]) == "function" then pcall(hook, f, method, Watch) end
+			if type(f[method]) == "function" then pcall(hook, f, method, SafeWatch) end
 		end
 	end
 	if type(f.HookScript) == "function" then
-		pcall(f.HookScript, f, "OnShow", Watch)
-		pcall(f.HookScript, f, "OnHide", Watch)
+		pcall(f.HookScript, f, "OnShow", SafeWatch)
+		pcall(f.HookScript, f, "OnHide", SafeWatch)
 	end
 end
 
