@@ -664,8 +664,15 @@ ns.On("WhoChanged", WhoChanged)
 ns.On("OwnedChanged", OwnedChanged)
 -- Item data came in for something: only worth a look when an answer of ours was waiting for
 -- data (a bag slot told "ask again" runs out of asks after a moment: DUI Plugins.lua:27-28).
+-- The kept answers stand (an answer waiting for data is never kept: Lookup), so only the bags are
+-- asked again and the watchers told: the waiting ones are worked out, the rest are cache hits.
+-- (At an Auction House this can come once a second while some item's data is late.)
 ns.On("ItemsArrived", function()
-	if pendingSeen and InUse() then Marks.Refresh() end
+	if not (pendingSeen and InUse()) then return end
+	if ns.Perf then ns.Perf.Count("bagsPending") end
+	pendingSeen = false
+	Repaint()
+	for _, fn in ipairs(watchers) do pcall(fn) end
 end)
 ns.On("Setting", Setting)
 

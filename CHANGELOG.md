@@ -1,5 +1,9 @@
 # Glowey's Gear
 
+## 1.2.4
+- At the Auction House, item data coming in no longer throws away every kept bag and tooltip answer once a second: only the ones still waiting are worked out.
+- The welcome no longer keeps asking every 5 seconds for the whole session while Daylight UI is busy: it gives up after ten minutes and asks at the next login.
+
 ## 1.2.3
 - Settings dropdowns no longer catch the click outside them: a click on a data text, an addon drawer or anything else closes the menu and reaches what you clicked the first time.
 - An error in placing Upgrades for Sale beside the Auction House is caught, so the Auction House window's own moves and shows go on.
