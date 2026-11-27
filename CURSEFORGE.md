@@ -6,8 +6,8 @@ By Glowey. A standalone addon that **integrates with Daylight UI** when it's ins
 
 ---
 
-## New in 1.3.1
-- **Every text in all six languages:** German, Spanish, French, Korean, Russian and Chinese.
+## New in 1.3.2
+- **No more double comparison:** when you hold Shift, the game's own comparison and Gear's no longer show the same piece twice, in the Upgrades for Sale list and on Glowey's Recipes' tooltips. When they compare different pieces (a weaker ring, a better piece in your bags), both still show, side by side.
 
 ---
 

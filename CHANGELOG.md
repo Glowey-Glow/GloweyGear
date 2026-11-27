@@ -1,6 +1,6 @@
 # Glowey's Gear
 
-## Unreleased
+## 1.3.2
 - The comparison beside an upgrade (in the Upgrades for Sale list, and on Glowey's Recipes' item tooltips) no longer shows twice: when the game's own comparison (Shift, or Always Compare Items) shows the same piece, Gear's steps aside until it goes, also while you hold Shift and move from item to item. When the two compare different pieces (a weaker ring, a piece in your bags), both still show, one on each side.
 
 ## 1.3.1
