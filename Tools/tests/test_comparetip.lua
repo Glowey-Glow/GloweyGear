@@ -23,6 +23,8 @@ local function frame(template)
 	function f:SetShown(on) self.shown = on and true or false end
 	function f:SetFrameStrata() end
 	function f:SetClampedToScreen() end
+	function f:SetAlpha(a) self.alpha = a end
+	function f:GetItem() return self.link and "Name" or nil, self.link end
 	function f:SetScript(name, fn) self.scripts[name] = fn end
 	function f:HookScript(name, fn) self.hooks = self.hooks or {}; self.hooks[name] = fn end
 	function f:SetOwner(owner) self.owner = owner end
@@ -119,6 +121,25 @@ T.case("the side: room, and away from the game's own comparison", function()
 	tip.scripts.OnEvent(tip, "MODIFIER_STATE_CHANGED", "LSHIFT", 0)
 	T.eq(side(), "TOPLEFT", "Shift let go: placed again")
 	T.check(tip.scripts.OnUpdate == nil, "no OnUpdate on our tooltip")
+end)
+
+T.case("the game's comparison shows the same piece: ours steps aside until it goes", function()
+	main.left, main.right = 600, 900
+	ShoppingTooltip1.shown, ShoppingTooltip1.link = false, nil
+	Tip.Show(main, { link = "item:200", replaces = { link = "item:100" } })
+	T.eq(tip.alpha, 1, "alone: ours shows")
+	ShoppingTooltip1.shown, ShoppingTooltip1.owner, ShoppingTooltip1.left, ShoppingTooltip1.link = true, main, 900, "item:100"
+	ShoppingTooltip1.hooks.OnShow(ShoppingTooltip1)
+	T.eq(tip.alpha, 0, "the game's shows the same boots: ours is out of sight")
+	T.check(tip:IsShown(), "but kept, to come back")
+	ShoppingTooltip1.shown = false
+	ShoppingTooltip1.hooks.OnHide(ShoppingTooltip1)
+	T.eq(tip.alpha, 1, "the game's gone (Shift let go): ours is back")
+	ShoppingTooltip1.shown, ShoppingTooltip1.link = true, "item:999"
+	ShoppingTooltip1.hooks.OnShow(ShoppingTooltip1)
+	T.eq(tip.alpha, 1, "the game's shows a different piece: both stay, on either side")
+	T.eq(side(), "TOPRIGHT", "ours on the other side")
+	ShoppingTooltip1.shown, ShoppingTooltip1.link = false, nil
 end)
 
 T.case("nothing to compare: hidden; gone with the item's tooltip", function()

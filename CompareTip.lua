@@ -11,7 +11,9 @@
 --
 -- Our own tooltip, never the game's ShoppingTooltip1 / 2: holding Shift (or "Always Compare
 -- Items") the game still shows ITS comparison with what is equipped in that slot, and ours goes on
--- the other side of the item's tooltip, so neither overwrites the other.
+-- the other side of the item's tooltip, so neither overwrites the other. When the game's shows the
+-- very piece ours would (the same item), ours steps aside (alpha 0) until the game's goes: the
+-- same comparison twice, and the game's reads the worn item itself (durability, soulbound).
 -- Source read (Gethe/wow-ui-source, branch forever):
 --   Blizzard_GameTooltip/Mainline/GameTooltip.xml:109-146  ShoppingTooltipTemplate: CompareHeader
 --     (its Label), hidden again by OnTooltipCleared; no supportsItemComparison (only GameTooltip,
@@ -38,6 +40,7 @@ ns.CompareTip = Tip
 local HEADER_PAD = 30      -- TooltipComparisonManager.lua: COMPARE_HEADER_PADDING
 local tip, made = nil, false
 local shownFor            -- the main tooltip ours stands beside
+local shownKey            -- the piece ours shows (its Stats.Key)
 local hooked = setmetatable({}, { __mode = "k" })   -- the tooltips whose OnHide we hooked
 local placeDue = false
 
@@ -135,9 +138,34 @@ local function TheirSide(main)
 	return SideOf(rawget(_G, "ShoppingTooltip1"), main) or SideOf(rawget(_G, "ShoppingTooltip2"), main)
 end
 
+local function KeyOf(link)
+	if type(link) ~= "string" then return nil end
+	local Stats = ns.Stats
+	if Stats and Stats.Key then
+		local ok, k = pcall(Stats.Key, link)
+		if ok and k then return k end
+	end
+	return link:match("item:(%d+)")
+end
+
+-- Whether the game's comparison beside `main` shows the piece ours does (either of its two, for
+-- rings and trinkets).
+local function TheyShowIt(main)
+	if not shownKey then return false end
+	for _, name in ipairs({ "ShoppingTooltip1", "ShoppingTooltip2" }) do
+		local s = rawget(_G, name)
+		if SideOf(s, main) and type(s.GetItem) == "function" then
+			local ok, _, link = pcall(s.GetItem, s)
+			if ok and KeyOf(link) == shownKey then return true end
+		end
+	end
+	return false
+end
+
 function Tip.Place(main)
 	local f = tip
 	if not f or not f:IsShown() or not main then return end
+	f:SetAlpha(TheyShowIt(main) and 0 or 1)
 	local side
 	local theirs = TheirSide(main)
 	if theirs then
@@ -172,6 +200,7 @@ function Tip.Show(main, row)
 	f:SetOwner(main, "ANCHOR_NONE")
 	f.side, f.anchoredTo = nil, nil
 	if not pcall(f.SetHyperlink, f, rep.link) then return Tip.Hide() end
+	shownKey = KeyOf(rep.link)
 	-- (After SetHyperlink: clearing the tooltip hides the header.)
 	local header = Worn(rep.link) and (rawget(_G, "EQUIPPED") or "Equipped") or L["In Your Bags"]
 	local h = f.CompareHeader
@@ -194,6 +223,6 @@ function Tip.Show(main, row)
 end
 
 function Tip.Hide()
-	shownFor = nil
+	shownFor, shownKey = nil, nil
 	if tip then tip:Hide() end
 end

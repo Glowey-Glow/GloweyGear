@@ -1,5 +1,8 @@
 # Glowey's Gear
 
+## Unreleased
+- The comparison beside an upgrade (in the Upgrades for Sale list, and on Glowey's Recipes' item tooltips) no longer shows twice: when the game's own comparison (Shift, or Always Compare Items) shows the same piece, Gear's steps aside until it goes. When the two compare different pieces (a weaker ring, a piece in your bags), both still show, one on each side.
+
 ## 1.3.1
 - Translations: every text is now in all six languages (German, Spanish, French, Korean, Russian and Chinese), Max Spend for All Slots and what it says of your picks, and the Glowey's plugins window included.
 
