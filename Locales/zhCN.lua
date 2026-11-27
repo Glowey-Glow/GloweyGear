@@ -312,3 +312,15 @@ L["In Your Bags"] = "在你的背包中"
 -- What's New (2026-11-24)
 L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."] = "对比提示：将鼠标悬停在“在售升级”中的物品上，它将替换的装备会显示在旁边，并附带属性变化。"
 L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."] = "与你的拍卖行插件配合：AuctionMaster、AHDB、Auctioneer 和 ForeverForge Auction 的完整扫描会填充列表，与 Auctionator、TSM 和 Oribos Exchange 同时使用时也能再次使用 Gear 自己的扫描。"
+
+-- Added 2026-11-26 (translation sweep): machine draft.
+L["%d more slot has an upgrade over it."] = "另有%d个部位有超出此额度的提升装备。"
+L["%d more slots have an upgrade over it."] = "另有%d个部位有超出此额度的提升装备。"
+L["Glowey's plugins, in one place."] = "Glowey的扩展，集中一处。"
+L["In gold. Items that cost more are never suggested. 0 means no limit. Type an amount in the box, or drag."] = "以金币计。价格更高的物品不会被推荐。0 表示不限。在框中输入数额，或拖动。"
+L["In gold: what the picks for all your slots may cost together. The most gain for the gold is picked, slot by slot. 0 means no limit."] = "以金币计：所有部位所选装备的总花费上限。逐个部位挑选每金币提升最多的。0 表示不限。"
+L["Its settings, a page each."] = "它的设置，每项一页。"
+L["Max Spend for All Slots"] = "所有部位的总花费上限"
+L["No upgrades for sale fit your max spend for all slots. Raise it to %s to see one."] = "没有符合你所有部位总花费上限的在售提升装备。把它提高到 %s 就能看到一件。"
+L["Open"] = "打开"
+L["The picks cost %s of your %s max spend."] = "所选装备花费%s，总花费上限为%s。"

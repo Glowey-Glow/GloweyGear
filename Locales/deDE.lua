@@ -312,3 +312,15 @@ L["In Your Bags"] = "In Euren Taschen"
 -- What's New (2026-11-24)
 L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."] = "Vergleichs-Tooltips: Fahrt mit der Maus über einen Gegenstand in „Verbesserungen im Angebot“, und das Teil, das er ersetzt, erscheint daneben, mit den Wertänderungen."
 L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."] = "Arbeitet mit Eurem Auktionshaus-Addon: Die vollständigen Scans von AuctionMaster, AHDB, Auctioneer und ForeverForge Auction füllen die Liste, und Gears eigener Scan ist neben Auctionator, TSM und Oribos Exchange wieder da."
+
+-- Added 2026-11-26 (translation sweep): machine draft.
+L["%d more slot has an upgrade over it."] = "%d weiterer Platz hat eine Verbesserung, die mehr kostet."
+L["%d more slots have an upgrade over it."] = "%d weitere Plätze haben eine Verbesserung, die mehr kostet."
+L["Glowey's plugins, in one place."] = "Die Plugins von Glowey an einem Ort."
+L["In gold. Items that cost more are never suggested. 0 means no limit. Type an amount in the box, or drag."] = "In Gold. Teurere Gegenstände werden nie vorgeschlagen. 0 heißt kein Limit. Gebt einen Betrag in das Feld ein oder zieht den Regler."
+L["In gold: what the picks for all your slots may cost together. The most gain for the gold is picked, slot by slot. 0 means no limit."] = "In Gold: was die Vorschläge für alle Eure Plätze zusammen kosten dürfen. Gewählt wird Platz für Platz die größte Verbesserung pro Gold. 0 heißt kein Limit."
+L["Its settings, a page each."] = "Seine Einstellungen, je eine Seite."
+L["Max Spend for All Slots"] = "Höchstausgabe für alle Plätze"
+L["No upgrades for sale fit your max spend for all slots. Raise it to %s to see one."] = "Keine angebotene Verbesserung passt in Eure Höchstausgabe für alle Plätze. Erhöht sie auf %s, um eine zu sehen."
+L["Open"] = "Öffnen"
+L["The picks cost %s of your %s max spend."] = "Die Vorschläge kosten %s von Eurer Höchstausgabe von %s."

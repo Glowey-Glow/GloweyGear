@@ -6,6 +6,9 @@ By Glowey. A standalone addon that **integrates with Daylight UI** when it's ins
 
 ---
 
+## New in 1.3.1
+- **Every text in all six languages:** German, Spanish, French, Korean, Russian and Chinese.
+
 ## New in 1.3.0
 - **Max Spend for All Slots:** a budget for the whole set of upgrades for sale. The picks fit it together, and Gear says what they cost, how many slots have an upgrade over it, and what to raise it to when nothing fits.
 - **Max Price per Item** can be typed in, in gold.

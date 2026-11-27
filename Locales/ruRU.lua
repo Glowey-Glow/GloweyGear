@@ -315,3 +315,16 @@ L["In Your Bags"] = "В ваших сумках"
 -- What's New (2026-11-24)
 L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."] = "Подсказки сравнения: наведите курсор на предмет в «Улучшениях на продажу», и рядом появится вещь, которую он заменит, с изменениями характеристик."
 L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."] = "Работает с вашим аддоном аукциона: полные сканирования AuctionMaster, AHDB, Auctioneer и ForeverForge Auction заполняют список, а собственное сканирование Gear снова доступно рядом с Auctionator, TSM и Oribos Exchange."
+
+-- Added 2026-11-26 (translation sweep): machine draft.
+L["%d more slot has an upgrade over it."] = "Ещё в %d ячейке есть улучшение дороже этого."
+L["%d more slots have an upgrade over it."] = "Ещё в %d ячейках есть улучшение дороже этого."
+L["Glowey's plugins, in one place."] = "Плагины Glowey в одном месте."
+L["In gold. Items that cost more are never suggested. 0 means no limit. Type an amount in the box, or drag."] = "В золоте. Предметы дороже никогда не предлагаются. 0 — без ограничения. Введите сумму в поле или перетащите ползунок."
+L["In gold: what the picks for all your slots may cost together. The most gain for the gold is picked, slot by slot. 0 means no limit."] = "В золоте: сколько вместе могут стоить предложения для всех ваших ячеек. Выбирается наибольший прирост за золото, ячейка за ячейкой. 0 — без ограничения."
+L["Its settings, a page each."] = "Его настройки, по странице на каждую."
+L["Max Spend for All Slots"] = "Предел трат на все ячейки"
+L["No upgrades for sale fit your max spend for all slots. Raise it to %s to see one."] = "Ни одно продаваемое улучшение не укладывается в предел трат на все ячейки. Поднимите его до %s, чтобы увидеть хотя бы одно."
+L["Open"] = "Открыть"
+L["The picks cost %s of your %s max spend."] = "Предложения стоят %s из вашего предела %s."
+L["%d more slots have an upgrade over it.#few"] = "Ещё в %d ячейках есть улучшение дороже этого."

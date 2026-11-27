@@ -1,5 +1,8 @@
 # Glowey's Gear
 
+## 1.3.1
+- Translations: every text is now in all six languages (German, Spanish, French, Korean, Russian and Chinese), Max Spend for All Slots and what it says of your picks, and the Glowey's plugins window included.
+
 ## 1.3.0
 - Max Spend for All Slots: a budget for the whole set of upgrades for sale. The picks fit it together, and it says what they cost of your budget, how many slots have an upgrade over it, and what to raise it to when nothing fits.
 - Max Price per Item can be typed in, in gold, like Max Spend.

@@ -312,3 +312,15 @@ L["In Your Bags"] = "가방에 있음"
 -- What's New (2026-11-24)
 L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."] = "비교 툴팁: 판매 중인 업그레이드에서 아이템에 마우스를 올리면 그것이 대체할 장비가 옆에 능력치 변화와 함께 표시됩니다."
 L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."] = "경매장 애드온과 함께 작동: AuctionMaster, AHDB, Auctioneer, ForeverForge Auction의 전체 검색으로 목록이 채워지고, Auctionator, TSM, Oribos Exchange와 함께 있어도 Gear 자체 검색을 다시 쓸 수 있습니다."
+
+-- Added 2026-11-26 (translation sweep): machine draft.
+L["%d more slot has an upgrade over it."] = "%d개 부위에 이보다 비싼 업그레이드가 더 있습니다."
+L["%d more slots have an upgrade over it."] = "%d개 부위에 이보다 비싼 업그레이드가 더 있습니다."
+L["Glowey's plugins, in one place."] = "Glowey 플러그인을 한곳에."
+L["In gold. Items that cost more are never suggested. 0 means no limit. Type an amount in the box, or drag."] = "골드 단위. 이보다 비싼 아이템은 추천하지 않습니다. 0은 제한 없음. 상자에 금액을 입력하거나 끌어서 정하세요."
+L["In gold: what the picks for all your slots may cost together. The most gain for the gold is picked, slot by slot. 0 means no limit."] = "골드 단위: 모든 부위의 추천 장비 합계로 쓸 수 있는 금액. 부위별로 골드 대비 향상이 가장 큰 것을 고릅니다. 0은 제한 없음."
+L["Its settings, a page each."] = "설정마다 페이지가 하나씩."
+L["Max Spend for All Slots"] = "모든 부위 최대 지출"
+L["No upgrades for sale fit your max spend for all slots. Raise it to %s to see one."] = "모든 부위 최대 지출에 맞는 판매 중인 상위 장비가 없습니다. %s까지 올리면 하나가 보입니다."
+L["Open"] = "열기"
+L["The picks cost %s of your %s max spend."] = "추천 장비 비용: %s (최대 지출 %s 중)."

@@ -312,3 +312,15 @@ L["In Your Bags"] = "En tus bolsas"
 -- What's New (2026-11-24)
 L["Comparison tooltips: hover an item in Upgrades for Sale and the piece it replaces shows beside it, with the stat changes."] = "Descripciones de comparación: pasa el ratón por un objeto de Mejoras en venta y la pieza que reemplaza aparece al lado, con los cambios de atributos."
 L["Works with your Auction House addon: AuctionMaster, AHDB, Auctioneer and ForeverForge Auction's full scans fill the list, and Gear's own scan is back beside Auctionator, TSM and Oribos Exchange."] = "Funciona con tu addon de casa de subastas: los escaneos completos de AuctionMaster, AHDB, Auctioneer y ForeverForge Auction llenan la lista, y el escaneo propio de Gear vuelve junto a Auctionator, TSM y Oribos Exchange."
+
+-- Added 2026-11-26 (translation sweep): machine draft.
+L["%d more slot has an upgrade over it."] = "%d ranura más tiene una mejora que cuesta más."
+L["%d more slots have an upgrade over it."] = "%d ranuras más tienen una mejora que cuesta más."
+L["Glowey's plugins, in one place."] = "Los complementos de Glowey, en un solo lugar."
+L["In gold. Items that cost more are never suggested. 0 means no limit. Type an amount in the box, or drag."] = "En oro. Nunca se sugieren objetos que cuesten más. 0 significa sin límite. Escribe una cantidad en el cuadro o arrastra."
+L["In gold: what the picks for all your slots may cost together. The most gain for the gold is picked, slot by slot. 0 means no limit."] = "En oro: lo que pueden costar juntas las elecciones para todas tus ranuras. Se elige la mayor mejora por el oro, ranura a ranura. 0 significa sin límite."
+L["Its settings, a page each."] = "Sus ajustes, una página para cada uno."
+L["Max Spend for All Slots"] = "Gasto máximo para todas las ranuras"
+L["No upgrades for sale fit your max spend for all slots. Raise it to %s to see one."] = "Ninguna mejora en venta cabe en tu gasto máximo para todas las ranuras. Súbelo a %s para ver una."
+L["Open"] = "Abrir"
+L["The picks cost %s of your %s max spend."] = "Las elecciones cuestan %s de tu gasto máximo de %s."
