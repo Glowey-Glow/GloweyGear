@@ -72,6 +72,14 @@ local main = frame()
 main.shown, main.left, main.right = true, 600, 900
 ShoppingTooltip1, ShoppingTooltip2 = frame(), frame()
 
+-- The game's comparison manager (TooltipComparisonManager.lua): RefreshItems fills the shopping
+-- tooltips again where they stand; compareInfo.item is the piece shown, by guid when worn.
+TooltipComparisonManager = { RefreshItems = function() end }
+function hooksecurefunc(t, key, fn)
+	local orig = t[key]
+	t[key] = function(...) local r = orig(...) fn(...) return r end
+end
+C_Item = { GetItemLinkByGUID = function(guid) return guid == "Item-worn-boots" and "item:100" or nil end }
 local worn = { [5] = "item:100" }
 local ns = { L = setmetatable({}, { __index = function(_, k) return k end }),
 	Game = { WornLink = function(slot) return worn[slot] end },
@@ -140,6 +148,29 @@ T.case("the game's comparison shows the same piece: ours steps aside until it go
 	T.eq(tip.alpha, 1, "the game's shows a different piece: both stay, on either side")
 	T.eq(side(), "TOPRIGHT", "ours on the other side")
 	ShoppingTooltip1.shown, ShoppingTooltip1.link = false, nil
+end)
+
+T.case("Shift held, item to item: the game fills its comparison again without hiding it", function()
+	local M = TooltipComparisonManager
+	main.left, main.right = 600, 900
+	ShoppingTooltip1.shown, ShoppingTooltip1.owner, ShoppingTooltip1.left, ShoppingTooltip1.link = true, main, 900, nil
+	-- First row: the game's shows a different piece (by guid); both stay.
+	M.tooltip, M.compareInfo = main, { item = { guid = "Item-other" } }
+	Tip.Show(main, { link = "item:200", replaces = { link = "item:100" } })
+	T.eq(tip.alpha, 1, "a different piece: ours shows")
+	-- Next row, Shift still held: no OnShow, only RefreshItems with the worn boots.
+	M.compareInfo = { item = { guid = "Item-worn-boots" } }
+	M:RefreshItems()
+	T.eq(tip.alpha, 0, "the game's now shows the same boots (by guid): ours steps aside")
+	-- A ring's second piece counts too.
+	M.compareInfo = { item = { hyperlink = "item:7" }, additionalItems = { { hyperlink = "item:100" } } }
+	M:RefreshItems()
+	T.eq(tip.alpha, 0, "the same piece as the game's second one")
+	M.compareInfo = { item = { hyperlink = "item:7" } }
+	M:RefreshItems()
+	T.eq(tip.alpha, 1, "and back when it isn't")
+	M.tooltip, M.compareInfo = nil, nil
+	ShoppingTooltip1.shown = false
 end)
 
 T.case("nothing to compare: hidden; gone with the item's tooltip", function()

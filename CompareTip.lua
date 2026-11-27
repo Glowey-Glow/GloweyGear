@@ -28,6 +28,10 @@
 --     an item is { hyperlink = link } (TooltipComparisonManager.lua:11-21)
 --   Blizzard_GameTooltip/Mainline/GameTooltip.lua:451-463  the tooltip calls its owner's
 --     UpdateTooltip every TOOLTIP_UPDATE_TIME while it shows.
+--   Blizzard_SharedXMLGame/Tooltip/TooltipComparisonManager.lua:148-260  moving from item to item
+--     with Shift held, the game fills ShoppingTooltip1 / 2 again where they stand (CompareItem ->
+--     RefreshItems), without hiding them: no OnShow to hear. Its compareInfo.item (and
+--     additionalItems, the second ring) is the piece shown, by guid for a worn one.
 
 -- luacheck: read globals CreateFrame UIParent
 
@@ -69,8 +73,14 @@ end
 
 -- The game's own comparison coming or going (Shift, "Always Compare Items") moves ours to the
 -- other side: its ShoppingTooltip1 / 2 showing or hiding, and Shift itself while ours shows.
-local shopHooked = false
+local shopHooked, managerHooked = false, false
 local function HookShopping()
+	local M = rawget(_G, "TooltipComparisonManager")
+	local hook = rawget(_G, "hooksecurefunc")
+	if not managerHooked and type(M) == "table" and type(M.RefreshItems) == "function" and hook then
+		managerHooked = true
+		hook(M, "RefreshItems", PlaceSoon)
+	end
 	if shopHooked then return end
 	local any = false
 	for _, name in ipairs({ "ShoppingTooltip1", "ShoppingTooltip2" }) do
@@ -148,10 +158,30 @@ local function KeyOf(link)
 	return link:match("item:(%d+)")
 end
 
+-- A piece the game's comparison shows, as its link: { hyperlink } or { guid } (a worn one).
+local function LinkOf(item)
+	if type(item) ~= "table" then return nil end
+	if type(item.hyperlink) == "string" then return item.hyperlink end
+	local C = rawget(_G, "C_Item")
+	if item.guid and type(C) == "table" and type(C.GetItemLinkByGUID) == "function" then
+		local ok, link = pcall(C.GetItemLinkByGUID, item.guid)
+		if ok then return link end
+	end
+	return nil
+end
+
 -- Whether the game's comparison beside `main` shows the piece ours does (either of its two, for
--- rings and trinkets).
+-- rings and trinkets): read from its manager (what it filled them with), else the tooltips.
 local function TheyShowIt(main)
-	if not shownKey then return false end
+	if not shownKey or not TheirSide(main) then return false end
+	local M = rawget(_G, "TooltipComparisonManager")
+	local info = type(M) == "table" and M.tooltip == main and M.compareInfo or nil
+	if type(info) == "table" then
+		if KeyOf(LinkOf(info.item)) == shownKey then return true end
+		for _, more in ipairs(type(info.additionalItems) == "table" and info.additionalItems or {}) do
+			if KeyOf(LinkOf(more)) == shownKey then return true end
+		end
+	end
 	for _, name in ipairs({ "ShoppingTooltip1", "ShoppingTooltip2" }) do
 		local s = rawget(_G, name)
 		if SideOf(s, main) and type(s.GetItem) == "function" then
